@@ -7,6 +7,10 @@ import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -47,7 +51,6 @@ class MainActivity : Activity() {
 
     private lateinit var cityView: TextView
     private lateinit var minutesView: TextView
-    private lateinit var unitView: TextView
     private lateinit var labelView: TextView
     private lateinit var panel: LinearLayout
     private val rows = ArrayList<TextView>()
@@ -88,10 +91,10 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
         }
         minutesView = TextView(this).apply {
-            textSize = 120f
+            textSize = 88f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            setPadding(dp(32), dp(8), dp(32), dp(8))
+            setPadding(dp(16), dp(8), dp(16), dp(8))
             // Basılı tutunca vakitler görünür, bırakınca gizlenir
             setOnTouchListener { v, e ->
                 when (e.actionMasked) {
@@ -104,12 +107,6 @@ class MainActivity : Activity() {
                 }
                 true
             }
-        }
-        unitView = TextView(this).apply {
-            text = "dakika"
-            textSize = 22f
-            setTextColor(Color.parseColor("#9FB3C8"))
-            gravity = Gravity.CENTER
         }
 
         panel = LinearLayout(this).apply {
@@ -129,7 +126,6 @@ class MainActivity : Activity() {
 
         center.addView(labelView)
         center.addView(minutesView)
-        center.addView(unitView)
         center.addView(panel)
         root.addView(center, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -215,6 +211,22 @@ class MainActivity : Activity() {
         }.timeInMillis
     }
 
+    private fun formatRemaining(totalMinutes: Int): CharSequence {
+        val h = totalMinutes / 60
+        val m = totalMinutes % 60
+        val sb = SpannableStringBuilder()
+        fun number(n: Int) = sb.append(n.toString())
+        fun unit(u: String) {
+            val start = sb.length
+            sb.append(u)
+            sb.setSpan(RelativeSizeSpan(0.27f), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            sb.setSpan(ForegroundColorSpan(Color.parseColor("#9FB3C8")), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        if (h > 0) { number(h); unit(" saat "); }
+        number(m); unit(" dakika")
+        return sb
+    }
+
     private fun refreshCountdown() {
         val t = times ?: return
         val now = System.currentTimeMillis()
@@ -222,7 +234,7 @@ class MainActivity : Activity() {
         val target = if (next >= 0) at(t[next]) else { next = 0; at(t[0], 1) }
         val minutes = ((target - now + 59_999) / 60_000).toInt()
 
-        minutesView.text = minutes.toString()
+        minutesView.text = formatRemaining(minutes)
         labelView.text = "${names[next]} vaktine kalan"
         for (i in names.indices) {
             rows[i].text = "${names[i].padEnd(8)}  ${t[i]}"
