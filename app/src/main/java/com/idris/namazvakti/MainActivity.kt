@@ -76,7 +76,7 @@ class MainActivity : Activity() {
         // Durum çubuğunu şeffaf yap, resim ekranın tamamını kaplasın
         window.statusBarColor = Color.TRANSPARENT
         window.decorView.systemUiVisibility =
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULL_SCREEN
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
         val statusId = resources.getIdentifier("status_bar_height", "dimen", "android")
         val statusH = if (statusId > 0) resources.getDimensionPixelSize(statusId) else dp(24)
 
