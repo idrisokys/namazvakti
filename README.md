@@ -3,7 +3,7 @@
 Bir sonraki namaz vaktine kalan dakikayı gösteren basit Android uygulaması.
 
 - İl değiştirmek için sağ üstteki il adına uzun basın.
-- Vakit listesini görmek için büyük sayıya basılı tutun.
+- Diğer vakitleri görmek için ekranın herhangi bir yerine (il yazısı hariç) basılı tutun; parmağınızı kaldırınca gizlenir.
 
 ## GitHub'da derleme
 Depoya push yapınca **Actions** sekmesinde "Android APK Derle" çalışır.

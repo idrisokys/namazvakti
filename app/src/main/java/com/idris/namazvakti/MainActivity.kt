@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -15,6 +17,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import org.json.JSONObject
@@ -64,72 +67,121 @@ class MainActivity : Activity() {
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
+    private fun shadow(tv: TextView) = tv.setShadowLayer(10f, 0f, 2f, Color.BLACK)
+
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val root = FrameLayout(this).apply { setBackgroundColor(Color.parseColor("#0F1B2D")) }
+        // Durum çubuğunu şeffaf yap, resim ekranın tamamını kaplasın
+        window.statusBarColor = Color.TRANSPARENT
+        window.decorView.systemUiVisibility =
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULL_SCREEN
+        val statusId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        val statusH = if (statusId > 0) resources.getDimensionPixelSize(statusId) else dp(24)
 
+        val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+
+        // Arka plan resmi
+        root.addView(ImageView(this).apply {
+            setImageResource(R.drawable.arkaplan)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+
+        // Yazıların okunması için hafif karartma (üst ve alt daha koyu)
+        root.addView(View(this).apply {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.parseColor("#80000000"), Color.parseColor("#1A000000"),
+                    Color.parseColor("#1A000000"), Color.parseColor("#99000000")))
+        }, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+
+        // Sol üst: ipucu
+        val hintView = TextView(this).apply {
+            text = "Diğer vakitler için basılı tut"
+            textSize = 13f
+            setTextColor(Color.parseColor("#E6FFFFFF"))
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            shadow(this)
+        }
+        root.addView(hintView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP or Gravity.START).apply { topMargin = statusH })
+
+        // Sağ üst: il (uzun basınca il seçimi)
         cityView = TextView(this).apply {
             textSize = 18f
             setTextColor(Color.WHITE)
             setPadding(dp(16), dp(16), dp(16), dp(16))
+            shadow(this)
             setOnLongClickListener { showCityPicker(); true }
         }
         root.addView(cityView, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.TOP or Gravity.END).apply { topMargin = dp(24) })
+            Gravity.TOP or Gravity.END).apply { topMargin = statusH })
 
+        // Geri sayım: Kâbe'nin üstündeki koyu gökyüzü bölgesinde
         val center = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
         }
-
         labelView = TextView(this).apply {
             textSize = 20f
-            setTextColor(Color.parseColor("#9FB3C8"))
+            setTextColor(Color.parseColor("#DDE6F0"))
             gravity = Gravity.CENTER
+            shadow(this)
         }
         minutesView = TextView(this).apply {
             textSize = 88f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             setPadding(dp(16), dp(8), dp(16), dp(8))
-            // Basılı tutunca vakitler görünür, bırakınca gizlenir
-            setOnTouchListener { v, e ->
-                when (e.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> {
-                        v.parent.requestDisallowInterceptTouchEvent(true)
-                        panel.visibility = View.VISIBLE
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
-                        panel.visibility = View.INVISIBLE
-                }
-                true
-            }
+            shadow(this)
         }
+        center.addView(labelView)
+        center.addView(minutesView)
+        root.addView(center, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP).apply {
+            topMargin = statusH + (resources.displayMetrics.heightPixels * 0.11f).toInt()
+        })
 
+        // Vakit listesi: altta, basılı tutulduğu sürece görünür
         panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.INVISIBLE
-            setPadding(dp(24), dp(24), dp(24), dp(8))
+            setPadding(dp(28), dp(16), dp(28), dp(16))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#99000000"))
+                cornerRadius = dp(20).toFloat()
+            }
         }
         for (i in names.indices) {
             val tv = TextView(this).apply {
                 textSize = 20f
-                setTextColor(Color.parseColor("#9FB3C8"))
+                typeface = Typeface.MONOSPACE
+                setTextColor(Color.parseColor("#C9D6E3"))
                 setPadding(0, dp(4), 0, dp(4))
+                shadow(this)
             }
             rows.add(tv)
             panel.addView(tv)
         }
+        root.addView(panel, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(56) })
 
-        center.addView(labelView)
-        center.addView(minutesView)
-        center.addView(panel)
-        root.addView(center, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.CENTER))
+        // İl yazısı dışında ekranın herhangi bir yerine basılı tutunca vakitler görünür,
+        // parmak kalkınca gizlenir. (İl yazısı dokunuşu kendisi aldığı için buraya gelmez.)
+        root.setOnTouchListener { _, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> panel.visibility = View.VISIBLE
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> panel.visibility = View.INVISIBLE
+            }
+            true
+        }
 
         setContentView(root)
         updateCityText()
@@ -220,7 +272,7 @@ class MainActivity : Activity() {
             val start = sb.length
             sb.append(u)
             sb.setSpan(RelativeSizeSpan(0.27f), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            sb.setSpan(ForegroundColorSpan(Color.parseColor("#9FB3C8")), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            sb.setSpan(ForegroundColorSpan(Color.parseColor("#C9D6E3")), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         if (h > 0) { number(h); unit(" saat "); }
         number(m); unit(" dakika")
@@ -238,7 +290,7 @@ class MainActivity : Activity() {
         labelView.text = "${names[next]} vaktine kalan"
         for (i in names.indices) {
             rows[i].text = "${names[i].padEnd(8)}  ${t[i]}"
-            rows[i].setTextColor(if (i == next) Color.WHITE else Color.parseColor("#9FB3C8"))
+            rows[i].setTextColor(if (i == next) Color.WHITE else Color.parseColor("#C9D6E3"))
         }
     }
 }
