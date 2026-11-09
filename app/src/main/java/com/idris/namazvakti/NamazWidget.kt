@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.BroadcastReceiver
 import android.content.Intent
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.View
@@ -87,33 +88,41 @@ class NamazWidget : AppWidgetProvider() {
             // Ölçüler: widget'a sığan EN BÜYÜK yazı boyutları (dp cinsinden hesaplanır, sp'ye çevrilir)
             val fs = c.resources.configuration.fontScale.coerceAtLeast(0.5f)
             fun sp(dp: Float) = (dp / fs).coerceAtLeast(6f)
+            val dyn = Build.VERSION.SDK_INT >= 31       // ikon boyutu çalışma anında ayarlanabilir mi
 
-            val compact = h < 125                       // alçak widget: kutucuk ikonlarını gizle
-            val free = h - 8f - 6f                      // kök dolgu + kart alt boşluğu düşülmüş
-            val cardH = free * 1.25f / 2.25f
-            val tileH = free / 2.25f
-            val tileW = (w - 8f) / 5f - 6f              // kutucuk kenar boşlukları düşülmüş
+            val compact = h < 100                       // çok alçak widget: kutucuk ikonlarını gizle
+            val free = h - 4f - 6f                      // kök dolgu + kart alt boşluğu düşülmüş
+            val cardH = free * 1.1f / 2.1f
+            val tileH = free / 2.1f
+            val tileW = (w - 4f) / 5f - 6f              // kutucuk kenar boşlukları düşülmüş
 
-            // Alt kutucuklar: saat (en büyük) + vakit adı
-            val tileAvail = tileH - 6f - 5f - (if (compact) 0f else 24f)   // dolgu + çizgi + ikon
-            val timeDp = minOf((tileW - 4f) / 2.8f, tileAvail / 2.16f).coerceAtLeast(9f)
-            val nameDp = minOf((tileW - 4f) / 3.3f, tileAvail / 1.2f - timeDp, timeDp * 0.85f).coerceAtLeast(8f)
+            // Alt kutucuklar: ikon + vakit adı + çizgi + saat (en büyük)
+            val iconSz = if (dyn) minOf(tileH * 0.34f, tileW * 0.55f) else 30f
+            val tileAvail = tileH - 8f - 7f - (if (compact) 0f else iconSz)  // dolgu + çizgi payı + ikon
+            val timeDp = minOf((tileW - 4f) / 2.8f, tileAvail / 1.92f).coerceAtLeast(9f)
+            val nameDp = minOf(timeDp * 0.64f, (tileW - 4f) / 3.3f).coerceAtLeast(8f)
             val timeSp = sp(timeDp)
             val nameSp = sp(nameDp)
 
-            // Üst kart: etiket + kalan süre (+ dalga) dikeyde, yazılar yatayda sığacak en büyük boyutta
-            val showWave = cardH >= 72f
-            val cardAvail = cardH - 12f - (if (showWave) 8f else 0f)
-            val availW = w - 8f - 6f - 20f - 52f - 17f  // kart dolgusu + ikon + ayırıcı
-            val labelChars = 14f
+            // Üst kart: büyük cami ikonu | etiket + kalan süre
+            val moonSz = if (dyn) minOf(cardH * 0.7f, w * 0.19f) else 60f
+            val cardAvail = cardH - 12f
+            val availW = w - 4f - 24f - moonSz - 17f
 
             for (i in 0 until 5) {
                 v.setTextViewTextSize(NAME_IDS[i], TypedValue.COMPLEX_UNIT_SP, nameSp)
                 v.setTextViewTextSize(TIME_IDS[i], TypedValue.COMPLEX_UNIT_SP, timeSp)
                 v.setTextViewText(NAME_IDS[i], PrayerData.names[SHOWN[i]])
                 v.setViewVisibility(ICON_IDS[i], if (compact) View.GONE else View.VISIBLE)
+                if (dyn) {
+                    v.setViewLayoutWidth(ICON_IDS[i], iconSz, TypedValue.COMPLEX_UNIT_DIP)
+                    v.setViewLayoutHeight(ICON_IDS[i], iconSz, TypedValue.COMPLEX_UNIT_DIP)
+                }
             }
-            v.setViewVisibility(R.id.w_wave, if (showWave) View.VISIBLE else View.GONE)
+            if (dyn) {
+                v.setViewLayoutWidth(R.id.w_moon, moonSz, TypedValue.COMPLEX_UNIT_DIP)
+                v.setViewLayoutHeight(R.id.w_moon, moonSz, TypedValue.COMPLEX_UNIT_DIP)
+            }
 
             v.setOnClickPendingIntent(
                 R.id.w_root,
@@ -144,8 +153,8 @@ class NamazWidget : AppWidgetProvider() {
             val text = if (hh > 0) "${hh}sa ${mm}dk" else "${mm}dk"
 
             // Kalan süre: yükseklik ve genişliğe sığacak en büyük boyut (etiket ≈ %40'ı)
-            val countDp = minOf(cardAvail / (1.2f * 1.4f), availW / (text.length * 0.6f)).coerceAtLeast(14f)
-            val labelDp = minOf(countDp * 0.4f, availW / (labelChars * 0.52f)).coerceAtLeast(9f)
+            val countDp = minOf(cardAvail / 1.71f, availW / (text.length * 0.62f)).coerceAtLeast(14f)
+            val labelDp = minOf(countDp * 0.46f, availW / (14f * 0.52f)).coerceAtLeast(9f)
             v.setTextViewTextSize(R.id.w_countdown, TypedValue.COMPLEX_UNIT_SP, sp(countDp))
             v.setTextViewTextSize(R.id.w_label, TypedValue.COMPLEX_UNIT_SP, sp(labelDp))
             v.setTextViewText(R.id.w_label, "${PrayerData.names[idx]} vaktine")
