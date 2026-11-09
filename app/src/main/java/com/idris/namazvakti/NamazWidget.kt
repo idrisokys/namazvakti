@@ -48,7 +48,6 @@ class NamazWidget : AppWidgetProvider() {
         private val NAME_IDS = intArrayOf(R.id.p0_name, R.id.p1_name, R.id.p2_name, R.id.p3_name, R.id.p4_name)
         private val TIME_IDS = intArrayOf(R.id.p0_time, R.id.p1_time, R.id.p2_time, R.id.p3_time, R.id.p4_time)
         private val TILE_IDS = intArrayOf(R.id.p0, R.id.p1, R.id.p2, R.id.p3, R.id.p4)
-        private val ICON_IDS = intArrayOf(R.id.p0_icon, R.id.p1_icon, R.id.p2_icon, R.id.p3_icon, R.id.p4_icon)
         private val ACCENT = 0xFFFFD54F.toInt()
         private val NAME_COLOR = 0xFFE3ECF7.toInt()
 
@@ -71,7 +70,7 @@ class NamazWidget : AppWidgetProvider() {
                     for (id in ids) {
                         val o = mgr.getAppWidgetOptions(id)
                         val w = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
-                        val h = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 130)
+                        val h = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160)
                         mgr.updateAppWidget(id, build(app, times, w, h))
                     }
                     if (times != null) schedule(app, (System.currentTimeMillis() / 60_000 + 1) * 60_000) // her dakika başı
@@ -90,39 +89,30 @@ class NamazWidget : AppWidgetProvider() {
             fun sp(dp: Float) = (dp / fs).coerceAtLeast(6f)
             val dyn = Build.VERSION.SDK_INT >= 31       // ikon boyutu çalışma anında ayarlanabilir mi
 
-            val compact = h < 100                       // çok alçak widget: kutucuk ikonlarını gizle
-            val free = h - 4f - 6f                      // kök dolgu + kart alt boşluğu düşülmüş
-            val cardH = free * 1.1f / 2.1f
-            val tileH = free / 2.1f
-            val tileW = (w - 4f) / 5f - 4f              // kutucuk kenar boşlukları düşülmüş
+            val inner = w - 4f - 6f                     // kök dolgu + kart/sütun arası boşluk
+            val leftW = inner * 1.45f / 2.45f
+            val rightW = inner / 2.45f
+            val cardAvailH = (h - 4f) - 16f             // kart içi yükseklik
+            val availW = leftW - 16f - 4f               // kart içi genişlik
 
-            // Alt kutucuklar: ikon + vakit adı + çizgi + saat (en büyük)
-            val iconSz = if (dyn) minOf(tileH * 0.34f, tileW * 0.55f) else 30f
-            val tileAvail = tileH - 8f - 7f - (if (compact) 0f else iconSz)  // dolgu + çizgi payı + ikon
-            val timeDp = minOf(tileW / 2.35f, tileAvail / 1.92f).coerceAtLeast(9f)
-            val nameDp = minOf(timeDp * 0.8f, tileW / 3.0f).coerceAtLeast(8f)
-            val timeSp = sp(timeDp)
-            val nameSp = sp(nameDp)
-
-            // Üst kart: büyük cami ikonu | etiket + kalan süre
-            val moonSz = if (dyn) minOf(cardH * 0.7f, w * 0.19f) else 60f
-            val cardAvail = cardH - 12f
-            val availW = w - 4f - 24f - moonSz - 17f
-
+            // Sağ: 5 satır; her satırda vakit adı (sol) + saat (sağ), yüksekliğe ve genişliğe sığan en büyük boyut
+            val rowH = (h - 4f) / 5f - 4f
+            val rowW = rightW - 24f - 8f                // yatay dolgu + ad-saat arası pay
+            val timeDp = minOf(rowW / 4.75f, (rowH - 4f) / 1.17f).coerceAtLeast(9f)
+            val nameDp = minOf(timeDp * 0.8f, (rowW - timeDp * 2.35f) / 3.0f).coerceAtLeast(8f)
             for (i in 0 until 5) {
-                v.setTextViewTextSize(NAME_IDS[i], TypedValue.COMPLEX_UNIT_SP, nameSp)
-                v.setTextViewTextSize(TIME_IDS[i], TypedValue.COMPLEX_UNIT_SP, timeSp)
+                v.setTextViewTextSize(NAME_IDS[i], TypedValue.COMPLEX_UNIT_SP, sp(nameDp))
+                v.setTextViewTextSize(TIME_IDS[i], TypedValue.COMPLEX_UNIT_SP, sp(timeDp))
                 v.setTextViewText(NAME_IDS[i], PrayerData.names[SHOWN[i]])
-                v.setViewVisibility(ICON_IDS[i], if (compact) View.GONE else View.VISIBLE)
-                if (dyn) {
-                    v.setViewLayoutWidth(ICON_IDS[i], iconSz, TypedValue.COMPLEX_UNIT_DIP)
-                    v.setViewLayoutHeight(ICON_IDS[i], iconSz, TypedValue.COMPLEX_UNIT_DIP)
-                }
             }
+
+            // Sol: cami ikonu kartın ~%24'ü; kalan yer etiket + kalan süreye
+            val moonSz = minOf(cardAvailH * 0.24f, availW * 0.5f)
             if (dyn) {
                 v.setViewLayoutWidth(R.id.w_moon, moonSz, TypedValue.COMPLEX_UNIT_DIP)
                 v.setViewLayoutHeight(R.id.w_moon, moonSz, TypedValue.COMPLEX_UNIT_DIP)
             }
+            val textH = cardAvailH - (if (dyn) moonSz else 40f)
 
             v.setOnClickPendingIntent(
                 R.id.w_root,
@@ -133,7 +123,7 @@ class NamazWidget : AppWidgetProvider() {
             )
 
             if (times == null) {
-                val lblDp = minOf(availW / 12f / 0.52f, cardAvail / 2.9f)
+                val lblDp = minOf(availW / (12f * 0.5f), textH / 2.9f)
                 v.setTextViewTextSize(R.id.w_label, TypedValue.COMPLEX_UNIT_SP, sp(lblDp))
                 v.setTextViewTextSize(R.id.w_countdown, TypedValue.COMPLEX_UNIT_SP, sp(lblDp * 2f))
                 v.setTextViewText(R.id.w_label, "İnternet yok")
@@ -150,17 +140,23 @@ class NamazWidget : AppWidgetProvider() {
             val minutes = ((target - now + 59_999) / 60_000).toInt()
             val hh = minutes / 60
             val mm = minutes % 60
-            val text = if (hh > 0) "${hh}sa ${mm}dk" else "${mm}dk"
 
-            // Kalan süre: yükseklik ve genişliğe sığacak en büyük boyut (etiket ≈ %40'ı)
-            val countDp = minOf(cardAvail / 1.71f, availW / (text.length * 0.56f)).coerceAtLeast(14f)
-            val labelDp = minOf(countDp * 0.46f, availW / (14f * 0.48f)).coerceAtLeast(9f)
+            // Kalan süre: tek satır ("10sa 40dk") ya da iki satır ("10sa" / "40dk"); hangisi daha büyük sığıyorsa o
+            val one = if (hh > 0) "${hh}sa ${mm}dk" else "${mm}dk"
+            val two = if (hh > 0) "${hh}sa\n${mm}dk" else one
+            val cw = 0.56f                              // karakter başına genişlik (em)
+            val c1 = minOf(textH / (1.17f * 1.42f), availW / (one.length * cw))
+            val longest = if (hh > 0) maxOf("${hh}sa".length, "${mm}dk".length) else one.length
+            val c2 = minOf(textH / (1.17f * 2.42f), availW / (longest * cw))
+            val useTwo = hh > 0 && c2 > c1
+            val countDp = (if (useTwo) c2 else c1).coerceAtLeast(14f)
+            val labelDp = minOf(countDp * 0.42f, availW / (14f * 0.48f)).coerceAtLeast(9f)
             v.setTextViewTextSize(R.id.w_countdown, TypedValue.COMPLEX_UNIT_SP, sp(countDp))
             v.setTextViewTextSize(R.id.w_label, TypedValue.COMPLEX_UNIT_SP, sp(labelDp))
             v.setTextViewText(R.id.w_label, "${PrayerData.names[idx]} vaktine")
-            v.setTextViewText(R.id.w_countdown, text)
+            v.setTextViewText(R.id.w_countdown, if (useTwo) two else one)
 
-            // Alt satır: İmsak, Öğle, İkindi, Akşam, Yatsı (Güneş hariç); sıradaki vakit altın çerçeveli
+            // 5 vakit: İmsak, Öğle, İkindi, Akşam, Yatsı (Güneş hariç); sıradaki vakit altın çerçeveli
             for (i in 0 until 5) {
                 val k = SHOWN[i]
                 val active = k == idx

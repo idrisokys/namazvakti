@@ -4,120 +4,82 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
-    android:orientation="vertical"
+    android:orientation="horizontal"
     android:padding="2dp">
 
-    <!-- Üst: büyük cam kart (cami+hilal | vaktine / kalan süre) -->
+    <!-- Sol: büyük cam kart (cami+hilal / vaktine / kalan süre) -->
     <LinearLayout
         android:id="@+id/w_card"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginBottom="6dp"
-        android:layout_weight="1.1"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="6dp"
+        android:layout_weight="1.45"
         android:background="@drawable/glass_card"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="14dp"
-        android:paddingTop="6dp"
-        android:paddingEnd="10dp"
-        android:paddingBottom="6dp">
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="8dp">
 
         <ImageView
             android:id="@+id/w_moon"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:contentDescription="@null"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_mosque_moon" />
 
-        <ImageView
-            android:layout_width="1dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="6dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="6dp"
-            android:background="#40FFFFFF"
-            android:contentDescription="@null" />
+        <TextView
+            android:id="@+id/w_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
 
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
+        <TextView
+            android:id="@+id/w_countdown"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
             android:gravity="center"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/w_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-light"
-                android:includeFontPadding="false"
-                android:maxLines="1"
-                android:textColor="#FFFFFF"
-                android:textSize="16sp" />
-
-            <TextView
-                android:id="@+id/w_countdown"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
-                android:includeFontPadding="false"
-                android:maxLines="1"
-                android:textColor="#FFFFFF"
-                android:textSize="36sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+            android:includeFontPadding="false"
+            android:maxLines="2"
+            android:textColor="#FFFFFF"
+            android:textSize="36sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Alt: 5 vakit kutucuğu -->
+    <!-- Sağ: 5 vakit alt alta -->
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
         android:layout_weight="1"
-        android:gravity="center"
-        android:orientation="horizontal">
+        android:orientation="vertical">
 
         <LinearLayout
             android:id="@+id/p0"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp"
             android:layout_weight="1"
             android:background="@drawable/glass_tile"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp">
-
-            <ImageView
-                android:id="@+id/p0_icon"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:contentDescription="@null"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_vakit_imsak" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
 
             <TextView
                 android:id="@+id/p0_name"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:fontFamily="sans-serif-medium"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#E3ECF7"
                 android:textSize="12sp" />
-
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginStart="8dp"
-                android:layout_marginTop="3dp"
-                android:layout_marginEnd="8dp"
-                android:layout_marginBottom="3dp"
-                android:background="#40FFFFFF"
-                android:contentDescription="@null" />
 
             <TextView
                 android:id="@+id/p0_time"
@@ -127,50 +89,33 @@
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#FFFFFF"
-                android:textSize="18sp"
+                android:textSize="15sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/p1"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp"
             android:layout_weight="1"
             android:background="@drawable/glass_tile"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp">
-
-            <ImageView
-                android:id="@+id/p1_icon"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:contentDescription="@null"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_vakit_ogle" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
 
             <TextView
                 android:id="@+id/p1_name"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:fontFamily="sans-serif-medium"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#E3ECF7"
                 android:textSize="12sp" />
-
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginStart="8dp"
-                android:layout_marginTop="3dp"
-                android:layout_marginEnd="8dp"
-                android:layout_marginBottom="3dp"
-                android:background="#40FFFFFF"
-                android:contentDescription="@null" />
 
             <TextView
                 android:id="@+id/p1_time"
@@ -180,50 +125,33 @@
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#FFFFFF"
-                android:textSize="18sp"
+                android:textSize="15sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/p2"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp"
             android:layout_weight="1"
             android:background="@drawable/glass_tile"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp">
-
-            <ImageView
-                android:id="@+id/p2_icon"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:contentDescription="@null"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_vakit_ikindi" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
 
             <TextView
                 android:id="@+id/p2_name"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:fontFamily="sans-serif-medium"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#E3ECF7"
                 android:textSize="12sp" />
-
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginStart="8dp"
-                android:layout_marginTop="3dp"
-                android:layout_marginEnd="8dp"
-                android:layout_marginBottom="3dp"
-                android:background="#40FFFFFF"
-                android:contentDescription="@null" />
 
             <TextView
                 android:id="@+id/p2_time"
@@ -233,50 +161,33 @@
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#FFFFFF"
-                android:textSize="18sp"
+                android:textSize="15sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/p3"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp"
             android:layout_weight="1"
             android:background="@drawable/glass_tile"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp">
-
-            <ImageView
-                android:id="@+id/p3_icon"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:contentDescription="@null"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_vakit_aksam" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
 
             <TextView
                 android:id="@+id/p3_name"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:fontFamily="sans-serif-medium"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#E3ECF7"
                 android:textSize="12sp" />
-
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginStart="8dp"
-                android:layout_marginTop="3dp"
-                android:layout_marginEnd="8dp"
-                android:layout_marginBottom="3dp"
-                android:background="#40FFFFFF"
-                android:contentDescription="@null" />
 
             <TextView
                 android:id="@+id/p3_time"
@@ -286,50 +197,33 @@
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#FFFFFF"
-                android:textSize="18sp"
+                android:textSize="15sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/p4"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp"
             android:layout_weight="1"
             android:background="@drawable/glass_tile"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp">
-
-            <ImageView
-                android:id="@+id/p4_icon"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:contentDescription="@null"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_vakit_yatsi" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
 
             <TextView
                 android:id="@+id/p4_name"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:fontFamily="sans-serif-medium"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#E3ECF7"
                 android:textSize="12sp" />
-
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginStart="8dp"
-                android:layout_marginTop="3dp"
-                android:layout_marginEnd="8dp"
-                android:layout_marginBottom="3dp"
-                android:background="#40FFFFFF"
-                android:contentDescription="@null" />
 
             <TextView
                 android:id="@+id/p4_time"
@@ -339,7 +233,7 @@
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#FFFFFF"
-                android:textSize="18sp"
+                android:textSize="15sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
