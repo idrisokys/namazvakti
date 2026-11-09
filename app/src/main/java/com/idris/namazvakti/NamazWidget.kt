@@ -8,8 +8,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.BroadcastReceiver
 import android.content.Intent
-import android.os.SystemClock
-import android.view.View
 import android.widget.RemoteViews
 import kotlin.concurrent.thread
 
@@ -51,7 +49,7 @@ class NamazWidget : AppWidgetProvider() {
 
                     val times = PrayerData.times(app)
                     mgr.updateAppWidget(ids, build(app, times))
-                    if (times != null) schedule(app, PrayerData.next(times).second)
+                    if (times != null) schedule(app, (System.currentTimeMillis() / 60_000 + 1) * 60_000) // her dakika başı
                 } catch (_: Exception) {
                 } finally {
                     pending?.finish()
@@ -59,9 +57,10 @@ class NamazWidget : AppWidgetProvider() {
             }
         }
 
+        private const val TARGET = 4 // Akşam
+
         private fun build(c: Context, times: List<String>?): RemoteViews {
             val v = RemoteViews(c.packageName, R.layout.widget_namaz)
-            v.setTextViewText(R.id.w_city, PrayerData.city(c))
             v.setOnClickPendingIntent(
                 R.id.w_root,
                 PendingIntent.getActivity(
@@ -70,19 +69,18 @@ class NamazWidget : AppWidgetProvider() {
                 )
             )
             if (times == null) {
-                v.setTextViewText(R.id.w_label, "İnternet bağlantısı gerekli")
-                v.setViewVisibility(R.id.w_countdown, View.GONE)
-                v.setTextViewText(R.id.w_time, "")
+                v.setTextViewText(R.id.w_label, "İnternet yok")
+                v.setTextViewText(R.id.w_countdown, "--")
                 return v
             }
-            val (idx, target) = PrayerData.next(times)
-            val remaining = target - System.currentTimeMillis()
-            v.setTextViewText(R.id.w_label, "${PrayerData.names[idx]} vaktine kalan")
-            v.setTextViewText(R.id.w_time, "${PrayerData.names[idx]} ${times[idx]}")
-            v.setViewVisibility(R.id.w_countdown, View.VISIBLE)
-            // Chronometer geri sayım: sistem kendisi saniyede bir günceller, pil harcamaz.
-            v.setChronometerCountDown(R.id.w_countdown, true)
-            v.setChronometer(R.id.w_countdown, SystemClock.elapsedRealtime() + remaining, null, true)
+            val now = System.currentTimeMillis()
+            var target = PrayerData.at(times[TARGET])
+            if (target <= now) target = PrayerData.at(times[TARGET], 1)
+            val minutes = ((target - now + 59_999) / 60_000).toInt()
+            val h = minutes / 60
+            val m = minutes % 60
+            v.setTextViewText(R.id.w_label, "${PrayerData.names[TARGET]} vaktine")
+            v.setTextViewText(R.id.w_countdown, if (h > 0) "${h}sa ${m}dk" else "${m}dk")
             return v
         }
 
