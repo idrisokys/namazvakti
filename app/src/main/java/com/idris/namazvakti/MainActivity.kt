@@ -197,6 +197,7 @@ class MainActivity : Activity() {
     override fun onPause() {
         super.onPause()
         handler.removeCallbacks(ticker)
+        NamazWidget.refresh(applicationContext) // il değişmiş olabilir, widget'ı güncelle
     }
 
     private fun city() = prefs.getString("city", "İstanbul") ?: "İstanbul"
