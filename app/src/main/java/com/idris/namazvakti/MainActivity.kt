@@ -11,10 +11,8 @@ import android.os.Handler
 import android.os.Looper
 import android.text.SpannableStringBuilder
 import android.text.Spanned
-import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -53,10 +51,22 @@ class MainActivity : Activity() {
     private var times: List<String>? = null
 
     private lateinit var cityView: TextView
+    private lateinit var dateView: TextView
     private lateinit var minutesView: TextView
     private lateinit var labelView: TextView
-    private lateinit var panel: LinearLayout
-    private val rows = ArrayList<TextView>()
+    private lateinit var sunriseView: TextView
+    private val tileBoxes = ArrayList<LinearLayout>()
+    private val tileNames = ArrayList<TextView>()
+    private val tileTimes = ArrayList<TextView>()
+
+    // names/keys indeksleri: 0 İmsak, 1 Güneş, 2 Öğle, 3 İkindi, 4 Akşam, 5 Yatsı
+    private val shown = intArrayOf(0, 2, 3, 4, 5)
+    private val tileIcons = intArrayOf(
+        R.drawable.ic_vakit_imsak, R.drawable.ic_vakit_ogle, R.drawable.ic_vakit_ikindi,
+        R.drawable.ic_vakit_aksam, R.drawable.ic_vakit_yatsi
+    )
+    private val gold = Color.parseColor("#FFD54F")
+    private val soft = Color.parseColor("#E3ECF7")
 
     private val ticker = object : Runnable {
         override fun run() {
@@ -69,16 +79,26 @@ class MainActivity : Activity() {
 
     private fun shadow(tv: TextView) = tv.setShadowLayer(10f, 0f, 2f, Color.BLACK)
 
+    private fun glass(radiusDp: Int, fill: Int, strokeDp: Int = 1, stroke: Int = Color.parseColor("#40FFFFFF")) =
+        GradientDrawable().apply {
+            setColor(fill)
+            cornerRadius = dp(radiusDp).toFloat()
+            setStroke(dp(strokeDp), stroke)
+        }
+
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Durum çubuğunu şeffaf yap, resim ekranın tamamını kaplasın
+        // Durum ve gezinme çubuğunu şeffaf yap, resim ekranın tamamını kaplasın
         window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
         window.decorView.systemUiVisibility =
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
         val statusId = resources.getIdentifier("status_bar_height", "dimen", "android")
         val statusH = if (statusId > 0) resources.getDimensionPixelSize(statusId) else dp(24)
+        val navId = resources.getIdentifier("navigation_bar_height", "dimen", "android")
+        val navH = if (navId > 0) resources.getDimensionPixelSize(navId) else 0
 
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
 
@@ -89,108 +109,169 @@ class MainActivity : Activity() {
         }, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
 
-        // Yazıların okunması için hafif karartma (üst ve alt daha koyu)
+        // Yazıların okunması için hafif mavi-lacivert karartma (üst ve alt daha koyu)
         root.addView(View(this).apply {
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.parseColor("#80000000"), Color.parseColor("#1A000000"),
-                    Color.parseColor("#1A000000"), Color.parseColor("#99000000")))
+                intArrayOf(Color.parseColor("#990A1A38"), Color.parseColor("#220A1A38"),
+                    Color.parseColor("#220A1A38"), Color.parseColor("#B30A1A38")))
         }, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
 
-        // Sol üst: ipucu
-        val hintView = TextView(this).apply {
-            text = "Diğer vakitler için basılı tut"
-            textSize = 13f
+        // Sol üst: tarih
+        dateView = TextView(this).apply {
+            textSize = 14f
+            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
             setTextColor(Color.parseColor("#E6FFFFFF"))
-            setPadding(dp(16), dp(16), dp(16), dp(16))
+            setPadding(dp(20), dp(18), dp(16), dp(16))
             shadow(this)
         }
-        root.addView(hintView, FrameLayout.LayoutParams(
+        root.addView(dateView, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.TOP or Gravity.START).apply { topMargin = statusH })
 
-        // Sağ üst: il (uzun basınca il seçimi)
+        // Sağ üst: il (cam hap; uzun basınca il seçimi)
         cityView = TextView(this).apply {
-            textSize = 18f
+            textSize = 15f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             setTextColor(Color.WHITE)
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            shadow(this)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            background = glass(20, Color.parseColor("#33FFFFFF"))
             setOnLongClickListener { showCityPicker(); true }
         }
         root.addView(cityView, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.TOP or Gravity.END).apply { topMargin = statusH })
+            Gravity.TOP or Gravity.END).apply {
+            topMargin = statusH + dp(12); rightMargin = dp(16)
+        })
 
-        // Geri sayım: Kâbe'nin üstündeki koyu gökyüzü bölgesinde
-        val center = LinearLayout(this).apply {
+        // Cam kart: [cami+hilal] | [vaktine / kalan süre / altın dalga]
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(18), dp(16), dp(18), dp(16))
+            setBackgroundResource(R.drawable.glass_card)
+            elevation = dp(6).toFloat()
+        }
+        card.addView(ImageView(this).apply {
+            setImageResource(R.drawable.ic_mosque_moon)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }, LinearLayout.LayoutParams(dp(84), dp(84)))
+        card.addView(View(this).apply { setBackgroundColor(Color.parseColor("#40FFFFFF")) },
+            LinearLayout.LayoutParams(dp(1), dp(84)).apply { setMargins(dp(14), 0, dp(14), 0) })
+
+        val texts = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
+            gravity = Gravity.CENTER
         }
         labelView = TextView(this).apply {
             textSize = 20f
-            setTextColor(Color.parseColor("#DDE6F0"))
+            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+            setTextColor(soft)
             gravity = Gravity.CENTER
-            shadow(this)
         }
         minutesView = TextView(this).apply {
-            textSize = 88f
+            textSize = 56f
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            setPadding(dp(16), dp(8), dp(16), dp(8))
+            includeFontPadding = false
+            setPadding(0, dp(2), 0, dp(4))
             shadow(this)
         }
-        center.addView(labelView)
-        center.addView(minutesView)
-        root.addView(center, FrameLayout.LayoutParams(
+        texts.addView(labelView)
+        texts.addView(minutesView)
+        texts.addView(ImageView(this).apply {
+            setImageResource(R.drawable.ic_wave)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }, LinearLayout.LayoutParams(dp(110), dp(14)))
+        card.addView(texts, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+        root.addView(card, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.TOP).apply {
             topMargin = statusH + (resources.displayMetrics.heightPixels * 0.11f).toInt()
+            leftMargin = dp(16); rightMargin = dp(16)
         })
 
-        // Vakit listesi: altta, basılı tutulduğu sürece görünür
-        panel = LinearLayout(this).apply {
+        // Alt bölüm: Güneş satırı + 5 vakit kutucuğu (her zaman görünür)
+        val bottom = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            visibility = View.INVISIBLE
-            setPadding(dp(28), dp(16), dp(28), dp(16))
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#99000000"))
-                cornerRadius = dp(20).toFloat()
-            }
+            gravity = Gravity.CENTER_HORIZONTAL
         }
-        for (i in names.indices) {
-            val tv = TextView(this).apply {
-                textSize = 20f
-                typeface = Typeface.MONOSPACE
-                setTextColor(Color.parseColor("#C9D6E3"))
-                setPadding(0, dp(4), 0, dp(4))
-                shadow(this)
-            }
-            rows.add(tv)
-            panel.addView(tv)
+        sunriseView = TextView(this).apply {
+            textSize = 13f
+            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+            setTextColor(Color.parseColor("#CCFFFFFF"))
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(10))
+            shadow(this)
         }
-        root.addView(panel, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(56) })
+        bottom.addView(sunriseView)
 
-        // İl yazısı dışında ekranın herhangi bir yerine basılı tutunca vakitler görünür,
-        // parmak kalkınca gizlenir. (İl yazısı dokunuşu kendisi aldığı için buraya gelmez.)
-        root.setOnTouchListener { _, e ->
-            when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> panel.visibility = View.VISIBLE
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> panel.visibility = View.INVISIBLE
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        for (i in shown.indices) {
+            val box = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                setPadding(dp(2), dp(12), dp(2), dp(12))
+                setBackgroundResource(R.drawable.glass_tile)
             }
-            true
+            box.addView(ImageView(this).apply {
+                setImageResource(tileIcons[i])
+                scaleType = ImageView.ScaleType.FIT_CENTER
+            }, LinearLayout.LayoutParams(dp(30), dp(30)))
+            val name = TextView(this).apply {
+                text = names[shown[i]]
+                textSize = 13f
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                setTextColor(soft)
+                gravity = Gravity.CENTER
+                setPadding(0, dp(4), 0, dp(6))
+                maxLines = 1
+            }
+            box.addView(name)
+            box.addView(View(this).apply { setBackgroundColor(Color.parseColor("#33FFFFFF")) },
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1)).apply {
+                    setMargins(dp(10), 0, dp(10), dp(6))
+                })
+            val time = TextView(this).apply {
+                textSize = 16f
+                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                maxLines = 1
+            }
+            box.addView(time)
+            tileBoxes.add(box); tileNames.add(name); tileTimes.add(time)
+            row.addView(box, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                .apply { setMargins(dp(4), 0, dp(4), 0) })
         }
+        bottom.addView(row, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        bottom.addView(TextView(this).apply {
+            text = "İli değiştirmek için il adına uzun basın"
+            textSize = 11f
+            setTextColor(Color.parseColor("#80FFFFFF"))
+            gravity = Gravity.CENTER
+            setPadding(0, dp(12), 0, 0)
+        })
+        root.addView(bottom, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.BOTTOM).apply {
+            leftMargin = dp(12); rightMargin = dp(12); bottomMargin = navH + dp(28)
+        })
 
         setContentView(root)
         updateCityText()
+        updateDate()
         loadTimes()
     }
 
     override fun onResume() {
         super.onResume()
         loadTimes()
+        updateDate()
         handler.post(ticker)
     }
 
@@ -202,7 +283,11 @@ class MainActivity : Activity() {
 
     private fun city() = prefs.getString("city", "İstanbul") ?: "İstanbul"
 
-    private fun updateCityText() { cityView.text = city() }
+    private fun updateCityText() { cityView.text = "📍 " + city() }
+
+    private fun updateDate() {
+        dateView.text = SimpleDateFormat("d MMMM EEEE", Locale("tr", "TR")).format(Date())
+    }
 
     private fun showCityPicker() {
         AlertDialog.Builder(this)
@@ -267,16 +352,17 @@ class MainActivity : Activity() {
     private fun formatRemaining(totalMinutes: Int): CharSequence {
         val h = totalMinutes / 60
         val m = totalMinutes % 60
+        // "19dk" veya "3sa 12dk"; saat varsa sığması için biraz küçülür
+        minutesView.textSize = if (h > 0) 44f else 60f
         val sb = SpannableStringBuilder()
-        fun number(n: Int) = sb.append(n.toString())
-        fun unit(u: String) {
+        fun part(n: Int, unit: String) {
+            sb.append(n.toString())
             val start = sb.length
-            sb.append(u)
-            sb.setSpan(RelativeSizeSpan(0.27f), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            sb.setSpan(ForegroundColorSpan(Color.parseColor("#C9D6E3")), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            sb.append(unit)
+            sb.setSpan(RelativeSizeSpan(0.78f), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
-        if (h > 0) { number(h); unit(" saat "); }
-        number(m); unit(" dakika")
+        if (h > 0) { part(h, "sa"); sb.append(" ") }
+        part(m, "dk")
         return sb
     }
 
@@ -288,10 +374,16 @@ class MainActivity : Activity() {
         val minutes = ((target - now + 59_999) / 60_000).toInt()
 
         minutesView.text = formatRemaining(minutes)
-        labelView.text = "${names[next]} vaktine kalan"
-        for (i in names.indices) {
-            rows[i].text = "${names[i].padEnd(8)}  ${t[i]}"
-            rows[i].setTextColor(if (i == next) Color.WHITE else Color.parseColor("#C9D6E3"))
+        labelView.text = "${names[next]} vaktine"
+        sunriseView.text = "${names[1]}  ${t[1]}"
+        for (i in shown.indices) {
+            val k = shown[i]
+            val active = k == next
+            tileTimes[i].text = t[k]
+            tileTimes[i].setTextColor(if (active) gold else Color.WHITE)
+            tileNames[i].setTextColor(if (active) gold else soft)
+            tileBoxes[i].setBackgroundResource(
+                if (active) R.drawable.glass_tile_active else R.drawable.glass_tile)
         }
     }
 }

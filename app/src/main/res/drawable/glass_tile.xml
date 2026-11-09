@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Alttaki vakit kutucukları -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:angle="315"
+        android:startColor="#994473AD"
+        android:endColor="#99183262" />
+    <stroke android:width="1dp" android:color="#40FFFFFF" />
+    <corners android:radius="16dp" />
+</shape>

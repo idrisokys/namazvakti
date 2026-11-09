@@ -8,8 +8,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.BroadcastReceiver
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.util.TypedValue
+import android.view.View
 import android.widget.RemoteViews
 import kotlin.concurrent.thread
 
@@ -44,7 +46,10 @@ class NamazWidget : AppWidgetProvider() {
         private val SHOWN = intArrayOf(0, 2, 3, 4, 5)
         private val NAME_IDS = intArrayOf(R.id.p0_name, R.id.p1_name, R.id.p2_name, R.id.p3_name, R.id.p4_name)
         private val TIME_IDS = intArrayOf(R.id.p0_time, R.id.p1_time, R.id.p2_time, R.id.p3_time, R.id.p4_time)
+        private val TILE_IDS = intArrayOf(R.id.p0, R.id.p1, R.id.p2, R.id.p3, R.id.p4)
+        private val ICON_IDS = intArrayOf(R.id.p0_icon, R.id.p1_icon, R.id.p2_icon, R.id.p3_icon, R.id.p4_icon)
         private val ACCENT = 0xFFFFD54F.toInt()
+        private val NAME_COLOR = 0xFFE3ECF7.toInt()
 
         private fun refreshIntent(c: Context) = PendingIntent.getBroadcast(
             c, 0,
@@ -64,16 +69,9 @@ class NamazWidget : AppWidgetProvider() {
                     val times = PrayerData.times(app)
                     for (id in ids) {
                         val o = mgr.getAppWidgetOptions(id)
-                        val w = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 60)
-                        val h = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 60)
-                        // Üst bölüm (etiket + kalan süre) yüksekliğin ~%55'i; alt bölüm 5 sütun
-                        val main = minOf((w - 16) / 5.0f, (h * 0.55f - 8) / 1.8f).coerceIn(10f, 60f)
-                        val colW = (w - 16) / 5.0f
-                        val time = minOf(colW / 3.0f, (h * 0.45f - 8) / 2.6f).coerceIn(8f, 24f)
-                        mgr.updateAppWidget(
-                            id,
-                            build(app, times, main, (main * 0.45f).coerceAtLeast(8f), time, (time * 0.65f).coerceAtLeast(7f))
-                        )
+                        val w = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
+                        val h = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 130)
+                        mgr.updateAppWidget(id, build(app, times, w, h))
                     }
                     if (times != null) schedule(app, (System.currentTimeMillis() / 60_000 + 1) * 60_000) // her dakika başı
                 } catch (_: Exception) {
@@ -83,18 +81,27 @@ class NamazWidget : AppWidgetProvider() {
             }
         }
 
-        private fun build(
-            c: Context, times: List<String>?,
-            mainSp: Float, labelSp: Float, timeSp: Float, nameSp: Float
-        ): RemoteViews {
+        private fun build(c: Context, times: List<String>?, w: Int, h: Int): RemoteViews {
             val v = RemoteViews(c.packageName, R.layout.widget_namaz)
-            v.setTextViewTextSize(R.id.w_countdown, TypedValue.COMPLEX_UNIT_SP, mainSp)
-            v.setTextViewTextSize(R.id.w_label, TypedValue.COMPLEX_UNIT_SP, labelSp)
+
+            // Ölçüler (dp ≈ sp): kart yüksekliği ~%55, kutucuklar ~%45
+            val compact = h < 125                       // alçak widget: kutucuk ikonlarını gizle
+            val cardH = (h - 8) * 0.55f
+            val tileW = (w - 8 - 5 * 6) / 5.0f
+            val tileH = (h - 8) * 0.45f
+            val timeSp = minOf(tileW / 3.3f, tileH / (if (compact) 2.2f else 3.2f)).coerceIn(9f, 20f)
+            val nameSp = (timeSp * 0.72f).coerceIn(8f, 14f)
+            val labelSp = (cardH * 0.17f).coerceIn(9f, 16f)
+
             for (i in 0 until 5) {
                 v.setTextViewTextSize(NAME_IDS[i], TypedValue.COMPLEX_UNIT_SP, nameSp)
                 v.setTextViewTextSize(TIME_IDS[i], TypedValue.COMPLEX_UNIT_SP, timeSp)
                 v.setTextViewText(NAME_IDS[i], PrayerData.names[SHOWN[i]])
+                v.setViewVisibility(ICON_IDS[i], if (compact) View.GONE else View.VISIBLE)
             }
+            v.setViewVisibility(R.id.w_wave, if (cardH < 60f) View.GONE else View.VISIBLE)
+            v.setTextViewTextSize(R.id.w_label, TypedValue.COMPLEX_UNIT_SP, labelSp)
+
             v.setOnClickPendingIntent(
                 R.id.w_root,
                 PendingIntent.getActivity(
@@ -102,27 +109,43 @@ class NamazWidget : AppWidgetProvider() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
             )
+
             if (times == null) {
+                v.setTextViewTextSize(R.id.w_countdown, TypedValue.COMPLEX_UNIT_SP, (cardH * 0.4f).coerceIn(14f, 40f))
                 v.setTextViewText(R.id.w_label, "İnternet yok")
                 v.setTextViewText(R.id.w_countdown, "--")
-                for (i in 0 until 5) v.setTextViewText(TIME_IDS[i], "--:--")
+                for (i in 0 until 5) {
+                    v.setTextViewText(TIME_IDS[i], "--:--")
+                    v.setInt(TILE_IDS[i], "setBackgroundResource", R.drawable.glass_tile)
+                }
                 return v
             }
+
             val now = System.currentTimeMillis()
             val (idx, target) = PrayerData.next(times) // sıradaki vakit (Yatsıdan sonra yarının İmsak'ı)
             val minutes = ((target - now + 59_999) / 60_000).toInt()
-            val h = minutes / 60
-            val m = minutes % 60
-            v.setTextViewText(R.id.w_label, "${PrayerData.names[idx]} vaktine")
-            v.setTextViewText(R.id.w_countdown, if (h > 0) "${h}sa ${m}dk" else "${m}dk")
+            val hh = minutes / 60
+            val mm = minutes % 60
+            val text = if (hh > 0) "${hh}sa ${mm}dk" else "${mm}dk"
 
-            // Alt satır: İmsak, Öğle, İkindi, Akşam, Yatsı (Güneş hariç); sıradaki vakit vurgulanır
+            // Kalan süre: yükseklik ve genişliğe sığacak en büyük boyut
+            val availW = w - 8 - 52 - 20 - 20f         // kart dolgusu + ikon + ayırıcı
+            val countSp = minOf(cardH * 0.46f, availW / (text.length * 0.56f)).coerceIn(14f, 44f)
+            v.setTextViewTextSize(R.id.w_countdown, TypedValue.COMPLEX_UNIT_SP, countSp)
+            v.setTextViewText(R.id.w_label, "${PrayerData.names[idx]} vaktine")
+            v.setTextViewText(R.id.w_countdown, text)
+
+            // Alt satır: İmsak, Öğle, İkindi, Akşam, Yatsı (Güneş hariç); sıradaki vakit altın çerçeveli
             for (i in 0 until 5) {
                 val k = SHOWN[i]
                 val active = k == idx
                 v.setTextViewText(TIME_IDS[i], times[k])
-                v.setTextColor(TIME_IDS[i], if (active) ACCENT else 0xFFFFFFFF.toInt())
-                v.setTextColor(NAME_IDS[i], if (active) ACCENT else 0xFFC9D6E3.toInt())
+                v.setTextColor(TIME_IDS[i], if (active) ACCENT else Color.WHITE)
+                v.setTextColor(NAME_IDS[i], if (active) ACCENT else NAME_COLOR)
+                v.setInt(
+                    TILE_IDS[i], "setBackgroundResource",
+                    if (active) R.drawable.glass_tile_active else R.drawable.glass_tile
+                )
             }
             return v
         }
