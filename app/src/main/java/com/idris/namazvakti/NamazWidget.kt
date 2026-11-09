@@ -13,6 +13,9 @@ import android.os.Bundle
 import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.concurrent.thread
 
 class NamazWidget : AppWidgetProvider() {
@@ -36,7 +39,7 @@ class NamazWidget : AppWidgetProvider() {
     }
 
     override fun onDisabled(context: Context) {
-        (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(refreshIntent(context))
+        cancelIfUnused(context)
     }
 
     companion object {
@@ -56,6 +59,15 @@ class NamazWidget : AppWidgetProvider() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        /** Hiç widget (1x3 ya da 2x2) kalmadıysa dakikalık alarmı iptal eder. */
+        fun cancelIfUnused(context: Context) {
+            val app = context.applicationContext
+            val mgr = AppWidgetManager.getInstance(app)
+            val any = mgr.getAppWidgetIds(ComponentName(app, NamazWidget::class.java)).isNotEmpty() ||
+                mgr.getAppWidgetIds(ComponentName(app, NamazWidget2x2::class.java)).isNotEmpty()
+            if (!any) (app.getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(refreshIntent(app))
+        }
+
         /** Tüm widget'ları günceller ve bir sonraki vakitte yeniden güncellenmek üzere alarm kurar. */
         fun refresh(context: Context, pending: BroadcastReceiver.PendingResult? = null) {
             val app = context.applicationContext
@@ -63,7 +75,8 @@ class NamazWidget : AppWidgetProvider() {
                 try {
                     val mgr = AppWidgetManager.getInstance(app)
                     val ids = mgr.getAppWidgetIds(ComponentName(app, NamazWidget::class.java))
-                    if (ids.isEmpty()) return@thread
+                    val ids2 = mgr.getAppWidgetIds(ComponentName(app, NamazWidget2x2::class.java))
+                    if (ids.isEmpty() && ids2.isEmpty()) return@thread
 
                     val times = PrayerData.times(app)
                     for (id in ids) {
@@ -72,12 +85,74 @@ class NamazWidget : AppWidgetProvider() {
                         val h = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 180)
                         mgr.updateAppWidget(id, build(app, times, w, h))
                     }
-                    if (times != null) schedule(app, (System.currentTimeMillis() / 60_000 + 1) * 60_000) // her dakika başı
+                    for (id in ids2) {
+                        val o = mgr.getAppWidgetOptions(id)
+                        val w = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 110)
+                        val h = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110)
+                        mgr.updateAppWidget(id, build2x2(app, times, w, h))
+                    }
+                    // 2x2 widget saat gösterdiği için internet olmasa da her dakika güncellenir
+                    if (times != null || ids2.isNotEmpty()) schedule(app, (System.currentTimeMillis() / 60_000 + 1) * 60_000) // her dakika başı
                 } catch (_: Exception) {
                 } finally {
                     pending?.finish()
                 }
             }
+        }
+
+        /** 2x2: en büyük kalın saat + altında "3sa 12dk" (ya da iki satır "3sa" / "12dk"), hangisi daha büyük sığarsa. */
+        private fun build2x2(c: Context, times: List<String>?, w: Int, h: Int): RemoteViews {
+            val v = RemoteViews(c.packageName, R.layout.widget_namaz_2x2)
+            val fs = c.resources.configuration.fontScale.coerceAtLeast(0.5f)
+            fun sp(dp: Float) = (dp / fs).coerceAtLeast(6f)
+
+            val lh = 1.2f                               // satır yüksekliği çarpanı (includeFontPadding=false)
+            val cw = 0.58f                              // kalın yazıda karakter başına genişlik (em)
+            val gap = 2f                                // saat ile kalan süre arası
+            val availW = w - 8f - 2f                    // dolgu + çerçeve payı
+            val availH = h - 8f - 2f
+
+            var one = "--"
+            var two = "--"
+            var longest = 2
+            if (times != null) {
+                val (_, target) = PrayerData.next(times)
+                val minutes = ((target - System.currentTimeMillis() + 59_999) / 60_000).toInt()
+                val hh = minutes / 60
+                val mm = minutes % 60
+                one = if (hh > 0) "${hh}sa ${mm}dk" else "${mm}dk"
+                two = if (hh > 0) "${hh}sa\n${mm}dk" else one
+                longest = if (hh > 0) maxOf("${hh}sa".length, "${mm}dk".length) else one.length
+            }
+
+            // Saat ("00:00" ≈ 2.65em) genişliğe, kalan süre (saatten büyük olmamak üzere) genişliğe sığar;
+            // toplam yükseklik taşarsa ikisi birlikte orantılı küçülür.
+            fun fit(lines: Int, chars: Int): Pair<Float, Float> {
+                val c0 = availW / 2.65f
+                val k0 = minOf(availW / (chars * cw), c0)
+                val need = lh * (c0 + lines * k0)
+                val f = if (need + gap > availH) (availH - gap) / need else 1f
+                return Pair(c0 * f, k0 * f)
+            }
+            val a = fit(1, one.length)
+            val b = if (two != one) fit(2, longest) else a
+            val useTwo = two != one && b.first + b.second > a.first + a.second
+            val best = if (useTwo) b else a
+            val clockDp = best.first.coerceAtLeast(10f)
+            val remainDp = best.second.coerceAtLeast(8f)
+
+            v.setTextViewTextSize(R.id.w_clock, TypedValue.COMPLEX_UNIT_SP, sp(clockDp))
+            v.setTextViewTextSize(R.id.w_remain, TypedValue.COMPLEX_UNIT_SP, sp(remainDp))
+            v.setTextViewText(R.id.w_clock, SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()))
+            v.setTextViewText(R.id.w_remain, if (useTwo) two else one)
+            v.setOnClickPendingIntent(
+                R.id.w_root,
+                PendingIntent.getActivity(
+                    c, 0, Intent(c, MainActivity::class.java),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+            return v
         }
 
         private fun build(c: Context, times: List<String>?, w: Int, h: Int): RemoteViews {

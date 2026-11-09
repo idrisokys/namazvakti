@@ -15,7 +15,10 @@
             </intent-filter>
         </activity>
 
-        <receiver android:name=".NamazWidget" android:exported="true">
+        <receiver
+            android:name=".NamazWidget"
+            android:exported="true"
+            android:label="Namaz Vakti (1x3)">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.intent.action.TIME_SET" />
@@ -24,6 +27,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_namaz_info" />
+        </receiver>
+
+        <receiver
+            android:name=".NamazWidget2x2"
+            android:exported="true"
+            android:label="Namaz Vakti (2x2)">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_namaz_2x2_info" />
         </receiver>
     </application>
 </manifest>
