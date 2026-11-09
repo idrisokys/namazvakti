@@ -7,29 +7,17 @@
     android:orientation="vertical"
     android:padding="2dp">
 
-    <!-- Cam kart: saat / sıradaki vakit adı / kalan süre -->
+    <!-- Küçük cam kart: sıradaki vakit adı / kalan süre -->
     <LinearLayout
         android:id="@+id/w_card"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginBottom="3dp"
-        android:layout_weight="4.3"
+        android:layout_weight="1.4"
         android:background="@drawable/glass_card"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="4dp">
-
-        <TextView
-            android:id="@+id/w_clock"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="2dp"
-            android:fontFamily="sans-serif"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+        android:padding="2dp">
 
         <TextView
             android:id="@+id/w_label"

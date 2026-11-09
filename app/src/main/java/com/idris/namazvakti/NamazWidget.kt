@@ -13,9 +13,6 @@ import android.os.Bundle
 import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import kotlin.concurrent.thread
 
 class NamazWidget : AppWidgetProvider() {
@@ -75,7 +72,7 @@ class NamazWidget : AppWidgetProvider() {
                         val h = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 180)
                         mgr.updateAppWidget(id, build(app, times, w, h))
                     }
-                    schedule(app, (System.currentTimeMillis() / 60_000 + 1) * 60_000) // her dakika başı
+                    if (times != null) schedule(app, (System.currentTimeMillis() / 60_000 + 1) * 60_000) // her dakika başı
                 } catch (_: Exception) {
                 } finally {
                     pending?.finish()
@@ -93,8 +90,8 @@ class NamazWidget : AppWidgetProvider() {
             val lh = 1.2f                               // satır yüksekliği çarpanı (includeFontPadding=false)
             val innerW = w - 4f                         // kök dolgu
             val free = (h - 4f) - 3f                    // kök dolgu + kartın alt boşluğu
-            val cardH = free * 4.3f / 10.8f             // üst kart: saat + vakit adı + kalan süre (weight 4.3)
-            val rowsH = free * 6.5f / 10.8f             // 5 vakit alanı (weight 6.5)
+            val cardH = free * 1.4f / 7.9f              // küçük üst kart: vakit adı + kalan süre (weight 1.4)
+            val rowsH = free * 6.5f / 7.9f              // 5 vakit alanı (weight 6.5)
 
             // 5 vakit: her kutuda ad (üstte, küçük) + saat (altta, büyük) alt alta
             val rowH = rowsH / 5f - 2f
@@ -108,13 +105,8 @@ class NamazWidget : AppWidgetProvider() {
             }
 
             // Kart: iç ölçüler
-            val availW = innerW - 8f - 2f               // kart dolgusu + çerçeve payı
-            val textH = cardH - 8f
-
-            // Kartın en üstü: şu anki saat ("00:00" ≈ 2.65em kalın), kart yüksekliğinin ~%28'i ile sınırlı
-            val clockDp = minOf(availW / 2.65f, textH * 0.28f / lh).coerceAtLeast(8f)
-            v.setTextViewTextSize(R.id.w_clock, TypedValue.COMPLEX_UNIT_SP, sp(clockDp))
-            v.setTextViewText(R.id.w_clock, SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()))
+            val availW = innerW - 4f - 2f               // kart dolgusu + çerçeve payı
+            val textH = cardH - 4f
 
             v.setOnClickPendingIntent(
                 R.id.w_root,
@@ -126,8 +118,8 @@ class NamazWidget : AppWidgetProvider() {
 
             if (times == null) {
                 val label = "İnternet"
-                val l = minOf(availW / (label.length * 0.55f), textH * 0.2f / lh).coerceAtLeast(7f)
-                val big = minOf((textH - clockDp * lh - l * lh - 4f) / lh, availW / (3 * 0.58f)).coerceAtLeast(8f)
+                val l = minOf(availW / (label.length * 0.55f), textH * 0.4f / lh).coerceAtLeast(7f)
+                val big = minOf((textH - l * lh - 2f) / lh, availW / (3 * 0.58f)).coerceAtLeast(8f)
                 v.setTextViewTextSize(R.id.w_label, TypedValue.COMPLEX_UNIT_SP, sp(l))
                 v.setTextViewTextSize(R.id.w_countdown, TypedValue.COMPLEX_UNIT_SP, sp(big))
                 v.setTextViewText(R.id.w_label, label)
@@ -145,12 +137,12 @@ class NamazWidget : AppWidgetProvider() {
             val hh = minutes / 60
             val mm = minutes % 60
 
-            // Etiket: sıradaki vaktin adı; genişliğe sığan en büyük kalın boyut, kart yüksekliğinin ~%20'si ile sınırlı
+            // Etiket: sıradaki vaktin adı; genişliğe sığan en büyük kalın boyut, kart yüksekliğinin ~%40'ı ile sınırlı
             val label = PrayerData.names[idx]
-            val labelDp = minOf(availW / (label.length * 0.55f), textH * 0.2f / lh).coerceAtLeast(7f)
+            val labelDp = minOf(availW / (label.length * 0.55f), textH * 0.4f / lh).coerceAtLeast(7f)
 
             // Kalan süre: tek satır ("10sa 40dk") ya da iki satır ("10sa" / "40dk"); hangisi daha büyük sığıyorsa o
-            val remH = textH - clockDp * lh - labelDp * lh - 4f
+            val remH = textH - labelDp * lh - 2f
             val one = if (hh > 0) "${hh}sa ${mm}dk" else "${mm}dk"
             val two = if (hh > 0) "${hh}sa\n${mm}dk" else one
             val cw = 0.58f                              // kalın yazıda karakter başına genişlik (em)
