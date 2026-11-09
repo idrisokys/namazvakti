@@ -118,17 +118,19 @@ class MainActivity : Activity() {
         }, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
 
-        // Sol üst: tarih
+        // Sol üst: tarih (il hapıyla birebir aynı görünüm)
         dateView = TextView(this).apply {
-            textSize = 14f
-            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
-            setTextColor(Color.parseColor("#E6FFFFFF"))
-            setPadding(dp(20), dp(18), dp(16), dp(16))
-            shadow(this)
+            textSize = 15f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setTextColor(Color.WHITE)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            background = glass(20, Color.parseColor("#33FFFFFF"))
         }
         root.addView(dateView, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.TOP or Gravity.START).apply { topMargin = statusH })
+            Gravity.TOP or Gravity.START).apply {
+            topMargin = statusH + dp(12); leftMargin = dp(16)
+        })
 
         // Sağ üst: il (cam hap; uzun basınca il seçimi)
         cityView = TextView(this).apply {
@@ -200,14 +202,16 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
         }
         sunriseView = TextView(this).apply {
-            textSize = 13f
-            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
-            setTextColor(Color.parseColor("#CCFFFFFF"))
+            textSize = 15f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, dp(10))
-            shadow(this)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            background = glass(20, Color.parseColor("#33FFFFFF"))
         }
-        bottom.addView(sunriseView)
+        bottom.addView(sunriseView, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            .apply { bottomMargin = dp(12) })
 
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         for (i in shown.indices) {
@@ -251,11 +255,15 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         bottom.addView(TextView(this).apply {
             text = "İli değiştirmek için il adına uzun basın"
-            textSize = 11f
-            setTextColor(Color.parseColor("#80FFFFFF"))
+            textSize = 15f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            setPadding(0, dp(12), 0, 0)
-        })
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            background = glass(20, Color.parseColor("#33FFFFFF"))
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            .apply { topMargin = dp(12) })
         root.addView(bottom, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.BOTTOM).apply {
@@ -286,7 +294,7 @@ class MainActivity : Activity() {
     private fun updateCityText() { cityView.text = "📍 " + city() }
 
     private fun updateDate() {
-        dateView.text = SimpleDateFormat("d MMMM EEEE", Locale("tr", "TR")).format(Date())
+        dateView.text = "📅 " + SimpleDateFormat("d MMMM EEEE", Locale("tr", "TR")).format(Date())
     }
 
     private fun showCityPicker() {
