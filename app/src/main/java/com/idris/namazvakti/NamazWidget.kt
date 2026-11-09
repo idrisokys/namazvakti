@@ -57,8 +57,6 @@ class NamazWidget : AppWidgetProvider() {
             }
         }
 
-        private const val TARGET = 4 // Akşam
-
         private fun build(c: Context, times: List<String>?): RemoteViews {
             val v = RemoteViews(c.packageName, R.layout.widget_namaz)
             v.setOnClickPendingIntent(
@@ -74,12 +72,11 @@ class NamazWidget : AppWidgetProvider() {
                 return v
             }
             val now = System.currentTimeMillis()
-            var target = PrayerData.at(times[TARGET])
-            if (target <= now) target = PrayerData.at(times[TARGET], 1)
+            val (idx, target) = PrayerData.next(times) // sıradaki vakit (Yatsıdan sonra yarının İmsak'ı)
             val minutes = ((target - now + 59_999) / 60_000).toInt()
             val h = minutes / 60
             val m = minutes % 60
-            v.setTextViewText(R.id.w_label, "${PrayerData.names[TARGET]} vaktine")
+            v.setTextViewText(R.id.w_label, "${PrayerData.names[idx]} vaktine")
             v.setTextViewText(R.id.w_countdown, if (h > 0) "${h}sa ${m}dk" else "${m}dk")
             return v
         }
