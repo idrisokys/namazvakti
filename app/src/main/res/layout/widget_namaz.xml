@@ -4,57 +4,51 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:padding="2dp">
 
-    <!-- Sol: büyük cam kart (cami+hilal / vaktine / kalan süre) -->
+    <!-- Üst: cam kart (vaktine / kalan süre) -->
     <LinearLayout
         android:id="@+id/w_card"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_marginEnd="6dp"
-        android:layout_weight="1.45"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginBottom="4dp"
+        android:layout_weight="2.2"
         android:background="@drawable/glass_card"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="8dp">
-
-        <ImageView
-            android:id="@+id/w_moon"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:contentDescription="@null"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_mosque_moon" />
+        android:padding="6dp">
 
         <TextView
             android:id="@+id/w_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="sans-serif"
             android:includeFontPadding="false"
             android:maxLines="1"
             android:textColor="#FFFFFF"
-            android:textSize="14sp" />
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/w_countdown"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-medium"
+            android:layout_marginTop="2dp"
+            android:fontFamily="sans-serif"
             android:gravity="center"
             android:includeFontPadding="false"
             android:maxLines="2"
             android:textColor="#FFFFFF"
-            android:textSize="36sp"
+            android:textSize="30sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Sağ: 5 vakit alt alta -->
+    <!-- Alt: 5 vakit alt alta -->
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="5"
         android:orientation="vertical">
 
         <LinearLayout
@@ -67,29 +61,31 @@
             android:background="@drawable/glass_tile"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp">
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
 
             <TextView
                 android:id="@+id/p0_name"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:fontFamily="sans-serif-medium"
+                android:fontFamily="sans-serif"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#E3ECF7"
-                android:textSize="12sp" />
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/p0_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
+                android:layout_marginStart="6dp"
+                android:fontFamily="sans-serif"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -103,29 +99,31 @@
             android:background="@drawable/glass_tile"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp">
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
 
             <TextView
                 android:id="@+id/p1_name"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:fontFamily="sans-serif-medium"
+                android:fontFamily="sans-serif"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#E3ECF7"
-                android:textSize="12sp" />
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/p1_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
+                android:layout_marginStart="6dp"
+                android:fontFamily="sans-serif"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -139,29 +137,31 @@
             android:background="@drawable/glass_tile"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp">
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
 
             <TextView
                 android:id="@+id/p2_name"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:fontFamily="sans-serif-medium"
+                android:fontFamily="sans-serif"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#E3ECF7"
-                android:textSize="12sp" />
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/p2_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
+                android:layout_marginStart="6dp"
+                android:fontFamily="sans-serif"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -175,29 +175,31 @@
             android:background="@drawable/glass_tile"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp">
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
 
             <TextView
                 android:id="@+id/p3_name"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:fontFamily="sans-serif-medium"
+                android:fontFamily="sans-serif"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#E3ECF7"
-                android:textSize="12sp" />
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/p3_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
+                android:layout_marginStart="6dp"
+                android:fontFamily="sans-serif"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -211,29 +213,31 @@
             android:background="@drawable/glass_tile"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp">
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
 
             <TextView
                 android:id="@+id/p4_name"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:fontFamily="sans-serif-medium"
+                android:fontFamily="sans-serif"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#E3ECF7"
-                android:textSize="12sp" />
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/p4_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
+                android:layout_marginStart="6dp"
+                android:fontFamily="sans-serif"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
