@@ -55,55 +55,19 @@ int naturalCompare(String a, String b) {
 }
 
 // ============================================================================
-//  Ayarlar
+//  Sunucu (sabit)
 // ============================================================================
+const _serverUrl = 'http://192.168.1.44:8080/';
+
 class Config {
-  String url;
-  String user;
-  String password;
-  bool allowInsecure;
-
-  Config({
-    this.url = '',
-    this.user = '',
-    this.password = '',
-    this.allowInsecure = false,
-  });
-
-  bool get isValid => url.isNotEmpty;
-
-  Map<String, String> get authHeaders {
-    if (user.isEmpty) return {};
-    final tok = base64Encode(utf8.encode('$user:$password'));
-    return {'Authorization': 'Basic $tok'};
-  }
-
-  static Future<Config> load() async {
-    final p = await SharedPreferences.getInstance();
-    return Config(
-      url: p.getString('url') ?? '',
-      user: p.getString('user') ?? '',
-      password: p.getString('password') ?? '',
-      allowInsecure: p.getBool('insecure') ?? false,
-    );
-  }
-
-  Future<void> save() async {
-    final p = await SharedPreferences.getInstance();
-    await p.setString('url', url);
-    await p.setString('user', user);
-    await p.setString('password', password);
-    await p.setBool('insecure', allowInsecure);
-  }
+  const Config();
+  String get url => _serverUrl;
+  Map<String, String> get authHeaders => const {};
+  bool get allowInsecure => false;
 }
 
-class _InsecureOverrides extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback = (cert, host, port) => true;
-  }
-}
+const kConfig = Config();
+
 
 // ============================================================================
 //  Izleme ilerlemesi
@@ -163,6 +127,20 @@ class DavItem {
   final String key; // cozulmus yol - ilerleme anahtari
   final bool isDir;
   DavItem(this.name, this.uri, this.key, this.isDir);
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'uri': uri.toString(),
+        'key': key,
+        'isDir': isDir,
+      };
+
+  factory DavItem.fromJson(Map<String, dynamic> m) => DavItem(
+        m['name'] as String,
+        Uri.parse(m['uri'] as String),
+        m['key'] as String,
+        m['isDir'] as bool,
+      );
 }
 
 class DavError implements Exception {
@@ -192,7 +170,7 @@ Future<List<DavItem>> propfind(Config cfg, Uri dir) async {
     final res = await http.Response.fromStream(streamed);
     if (res.statusCode == 401 || res.statusCode == 403) {
       throw DavError(
-          'Yetkilendirme hatasi (${res.statusCode}). Kullanici adi / sifreyi kontrol edin.');
+          'Yetkilendirme hatasi (${res.statusCode}). Sunucu kimlik dogrulama istiyor.');
     }
     if (res.statusCode != 207 && res.statusCode != 200) {
       throw DavError('Sunucu hatasi: HTTP ${res.statusCode}');
@@ -236,7 +214,7 @@ Future<List<DavItem>> propfind(Config cfg, Uri dir) async {
     throw DavError('Baglanti kurulamadi: ${e.message}');
   } on HandshakeException {
     throw DavError(
-        'SSL sertifika hatasi. Ayarlardan "Gecersiz sertifikaya izin ver" secenegini acabilirsiniz.');
+        'SSL sertifika hatasi.');
   } on XmlException {
     throw DavError('Sunucudan gecersiz yanit alindi (WebDAV adresi dogru mu?).');
   } finally {
@@ -245,12 +223,328 @@ Future<List<DavItem>> propfind(Config cfg, Uri dir) async {
 }
 
 // ============================================================================
+//  Izleme listesi (kalici)
+// ============================================================================
+class WlFolder {
+  final String id;
+  String name;
+  WlFolder(this.id, this.name);
+}
+
+class WlItem {
+  final DavItem item;
+  String? folder;
+  WlItem(this.item, this.folder);
+}
+
+class AddResult {
+  final int added;
+  final int moved;
+  const AddResult(this.added, this.moved);
+}
+
+class WatchlistStore extends ChangeNotifier {
+  WatchlistStore._();
+  static final WatchlistStore instance = WatchlistStore._();
+
+  late SharedPreferences _p;
+  final List<WlFolder> folders = [];
+  final List<WlItem> items = [];
+
+  Future<void> init() async {
+    _p = await SharedPreferences.getInstance();
+    final raw = _p.getString('watchlist');
+    if (raw == null) return;
+    try {
+      final m = jsonDecode(raw) as Map<String, dynamic>;
+      for (final f in (m['folders'] as List? ?? [])) {
+        folders.add(WlFolder(f['id'] as String, f['name'] as String));
+      }
+      for (final i in (m['items'] as List? ?? [])) {
+        items.add(WlItem(
+          DavItem.fromJson(Map<String, dynamic>.from(i as Map)),
+          i['folder'] as String?,
+        ));
+      }
+    } catch (_) {
+      folders.clear();
+      items.clear();
+    }
+  }
+
+  Future<void> _save() async {
+    await _p.setString(
+      'watchlist',
+      jsonEncode({
+        'folders': [
+          for (final f in folders) {'id': f.id, 'name': f.name},
+        ],
+        'items': [
+          for (final i in items) {...i.item.toJson(), 'folder': i.folder},
+        ],
+      }),
+    );
+    notifyListeners();
+  }
+
+  bool contains(String key) => items.any((e) => e.item.key == key);
+
+  List<WlItem> itemsIn(String? folder) =>
+      items.where((e) => e.folder == folder).toList();
+
+  int countIn(String id) => items.where((e) => e.folder == id).length;
+
+  WlFolder? folderById(String? id) {
+    if (id == null) return null;
+    for (final f in folders) {
+      if (f.id == id) return f;
+    }
+    return null;
+  }
+
+  Future<WlFolder> createFolder(String name) async {
+    final f = WlFolder(DateTime.now().microsecondsSinceEpoch.toString(), name);
+    folders.add(f);
+    await _save();
+    return f;
+  }
+
+  Future<void> renameFolder(String id, String name) async {
+    final f = folderById(id);
+    if (f == null) return;
+    f.name = name;
+    await _save();
+  }
+
+  /// Klasor silinince icindeki ogeler ana listeye tasinir.
+  Future<void> deleteFolder(String id) async {
+    for (final i in items) {
+      if (i.folder == id) i.folder = null;
+    }
+    folders.removeWhere((f) => f.id == id);
+    await _save();
+  }
+
+  Future<AddResult> addAll(Iterable<DavItem> list, {String? folder}) async {
+    var added = 0, moved = 0;
+    for (final it in list) {
+      final idx = items.indexWhere((e) => e.item.key == it.key);
+      if (idx < 0) {
+        items.add(WlItem(it, folder));
+        added++;
+      } else if (folder != null && items[idx].folder != folder) {
+        items[idx].folder = folder;
+        moved++;
+      }
+    }
+    if (added + moved > 0) await _save();
+    return AddResult(added, moved);
+  }
+
+  Future<void> moveItem(String key, String? folder) async {
+    final idx = items.indexWhere((e) => e.item.key == key);
+    if (idx < 0) return;
+    items[idx].folder = folder;
+    await _save();
+  }
+
+  Future<void> removeItem(String key) async {
+    items.removeWhere((e) => e.item.key == key);
+    await _save();
+  }
+}
+
+// ============================================================================
+//  Ortak diyaloglar
+// ============================================================================
+class _NameDialog extends StatefulWidget {
+  final String title;
+  final String initial;
+  const _NameDialog({required this.title, required this.initial});
+  @override
+  State<_NameDialog> createState() => _NameDialogState();
+}
+
+class _NameDialogState extends State<_NameDialog> {
+  late final TextEditingController _c =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _c,
+        autofocus: true,
+        textInputAction: TextInputAction.done,
+        decoration: const InputDecoration(
+          labelText: 'Klasör adı',
+          border: OutlineInputBorder(),
+        ),
+        onSubmitted: (v) => Navigator.pop(context, v.trim()),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('İptal'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _c.text.trim()),
+          child: const Text('Tamam'),
+        ),
+      ],
+    );
+  }
+}
+
+Future<String?> askName(BuildContext context, String title,
+    {String initial = ''}) async {
+  final r = await showDialog<String>(
+    context: context,
+    builder: (_) => _NameDialog(title: title, initial: initial),
+  );
+  if (r == null || r.isEmpty) return null;
+  return r;
+}
+
+Future<bool> askConfirm(BuildContext context, String title, String body) async {
+  final r = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: Text(body),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('İptal'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Evet'),
+        ),
+      ],
+    ),
+  );
+  return r ?? false;
+}
+
+class FolderChoice {
+  final String? id; // null = ana liste
+  const FolderChoice(this.id);
+}
+
+Widget _optRow(IconData icon, String text, {bool current = false}) {
+  return Row(
+    children: [
+      Icon(icon, color: Colors.amber),
+      const SizedBox(width: 14),
+      Expanded(child: Text(text, overflow: TextOverflow.ellipsis)),
+      if (current) const Icon(Icons.check, size: 18),
+    ],
+  );
+}
+
+/// Klasor sec / yeni klasor olustur. Iptalde null doner.
+Future<FolderChoice?> showFolderPicker(
+  BuildContext context, {
+  String? current,
+  bool allowRoot = true,
+  String title = 'Klasör seç',
+}) {
+  return showDialog<FolderChoice>(
+    context: context,
+    builder: (ctx) {
+      final st = WatchlistStore.instance;
+      return SimpleDialog(
+        title: Text(title),
+        children: [
+          if (allowRoot)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, const FolderChoice(null)),
+              child: _optRow(Icons.home_outlined, 'Ana liste',
+                  current: current == null),
+            ),
+          for (final f in st.folders)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, FolderChoice(f.id)),
+              child: _optRow(Icons.folder_special, f.name,
+                  current: current == f.id),
+            ),
+          SimpleDialogOption(
+            onPressed: () async {
+              final name = await askName(ctx, 'Yeni klasör');
+              if (name == null) return;
+              final f = await st.createFolder(name);
+              if (ctx.mounted) Navigator.pop(ctx, FolderChoice(f.id));
+            },
+            child: _optRow(Icons.create_new_folder_outlined, 'Yeni klasör oluştur'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+// ============================================================================
+//  Ortak ogeler (ikonlar)
+// ============================================================================
+Widget statusIcon(DavItem it, {bool inWatchlist = false}) {
+  if (it.isDir) {
+    return Icon(inWatchlist ? Icons.folder_open : Icons.folder,
+        color: Colors.lightBlueAccent, size: 28);
+  }
+  final e = ProgressStore.instance.get(it.key);
+  if (e.watched) {
+    return const Icon(Icons.check_circle, color: Colors.green, size: 28);
+  }
+  if (e.pos > 5 && e.dur > 0) {
+    return SizedBox(
+      width: 26,
+      height: 26,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox.expand(
+            child: CircularProgressIndicator(
+              value: (e.pos / e.dur).clamp(0.03, 1.0),
+              strokeWidth: 3.5,
+              color: Colors.orange,
+              backgroundColor: Colors.white24,
+            ),
+          ),
+          const Icon(Icons.play_arrow, size: 14, color: Colors.orange),
+        ],
+      ),
+    );
+  }
+  return const Icon(Icons.movie_outlined, color: Colors.white38, size: 26);
+}
+
+String? progressText(DavItem it) {
+  if (it.isDir) return null;
+  final e = ProgressStore.instance.get(it.key);
+  if (!e.watched && e.pos > 5 && e.dur > 0) {
+    return '${fmtSec(e.pos)} / ${fmtSec(e.dur)}  •  %${(e.pos / e.dur * 100).floor()}';
+  }
+  if (e.watched) return 'İzlendi';
+  return null;
+}
+
+
+// ============================================================================
 //  Uygulama
 // ============================================================================
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   await ProgressStore.instance.init();
+  await WatchlistStore.instance.init();
   runApp(const App());
 }
 
@@ -269,220 +563,213 @@ class App extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const Root(),
+      builder: (context, child) {
+        // Genis ekranlarda (Android TV / tablet) yaziyi biraz buyut
+        final mq = MediaQuery.of(context);
+        if (Platform.isAndroid && mq.size.width >= 900) {
+          return MediaQuery(
+            data: mq.copyWith(textScaler: TextScaler.linear(1.15)),
+            child: child!,
+          );
+        }
+        return child!;
+      },
+      home: const WatchlistScreen(),
     );
   }
 }
 
-class Root extends StatefulWidget {
-  const Root({super.key});
+// ============================================================================
+//  Izleme listem (acilis ekrani)
+// ============================================================================
+class WatchlistScreen extends StatefulWidget {
+  final String? folderId; // null = ana liste
+  const WatchlistScreen({super.key, this.folderId});
   @override
-  State<Root> createState() => _RootState();
+  State<WatchlistScreen> createState() => _WatchlistScreenState();
 }
 
-class _RootState extends State<Root> {
-  Config? cfg;
-  int version = 0;
+class _WatchlistScreenState extends State<WatchlistScreen> {
+  final st = WatchlistStore.instance;
 
-  @override
-  void initState() {
-    super.initState();
-    Config.load().then((c) {
-      _apply(c);
-      if (mounted) setState(() => cfg = c);
-    });
+  Future<void> _newFolder() async {
+    final name = await askName(context, 'Yeni klasör');
+    if (name != null) await st.createFolder(name);
   }
 
-  void _apply(Config c) {
-    HttpOverrides.global = c.allowInsecure ? _InsecureOverrides() : null;
-  }
-
-  void _openSettings() {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (ctx) => SettingsScreen(
-        cfg: cfg!,
-        cancelable: true,
-        onSaved: (c) {
-          Navigator.of(ctx).pop();
-          _apply(c);
-          setState(() {
-            cfg = c;
-            version++;
-          });
-        },
+  Future<void> _openAdd() async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => BrowserScreen(
+        start: Uri.parse(kConfig.url),
+        selectMode: true,
+        targetFolder: widget.folderId,
       ),
     ));
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _play(DavItem it) async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => PlayerScreen(cfg: kConfig, item: it),
+    ));
+    if (mounted) setState(() {}); // ikonlari guncelle
+  }
+
+  Future<void> _openDir(DavItem it) async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => BrowserScreen(start: it.uri, selectMode: false),
+    ));
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _moveItem(WlItem w) async {
+    final c = await showFolderPicker(
+      context,
+      current: w.folder,
+      title: 'Klasöre taşı',
+    );
+    if (c == null) return;
+    await st.moveItem(w.item.key, c.id);
+  }
+
+  Future<void> _renameFolder(WlFolder f) async {
+    final name = await askName(context, 'Klasörü yeniden adlandır',
+        initial: f.name);
+    if (name != null) await st.renameFolder(f.id, name);
+  }
+
+  Future<void> _deleteFolder(WlFolder f) async {
+    final ok = await askConfirm(context, 'Klasör silinsin mi?',
+        '"${f.name}" silinir. İçindeki öğeler ana listeye taşınır.');
+    if (ok) await st.deleteFolder(f.id);
   }
 
   @override
   Widget build(BuildContext context) {
-    final c = cfg;
-    if (c == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    if (!c.isValid) {
-      return SettingsScreen(
-        cfg: c,
-        cancelable: false,
-        onSaved: (n) {
-          _apply(n);
-          setState(() {
-            cfg = n;
-            version++;
-          });
-        },
-      );
-    }
-    return BrowserScreen(
-      key: ValueKey(version),
-      cfg: c,
-      onOpenSettings: _openSettings,
-    );
-  }
-}
+    return AnimatedBuilder(
+      animation: st,
+      builder: (context, _) {
+        final inRoot = widget.folderId == null;
+        final folder = st.folderById(widget.folderId);
+        final folders = inRoot ? st.folders : <WlFolder>[];
+        final its = st.itemsIn(widget.folderId);
+        final empty = folders.isEmpty && its.isEmpty;
 
-// ============================================================================
-//  Ayarlar ekrani
-// ============================================================================
-class SettingsScreen extends StatefulWidget {
-  final Config cfg;
-  final bool cancelable;
-  final void Function(Config) onSaved;
-  const SettingsScreen({
-    super.key,
-    required this.cfg,
-    required this.onSaved,
-    required this.cancelable,
-  });
-  @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  late final TextEditingController _url =
-      TextEditingController(text: widget.cfg.url);
-  late final TextEditingController _user =
-      TextEditingController(text: widget.cfg.user);
-  late final TextEditingController _pass =
-      TextEditingController(text: widget.cfg.password);
-  late bool _insecure = widget.cfg.allowInsecure;
-  bool _obscure = true;
-  String? _err;
-
-  @override
-  void dispose() {
-    _url.dispose();
-    _user.dispose();
-    _pass.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    var u = _url.text.trim();
-    if (u.isEmpty) {
-      setState(() => _err = 'Sunucu adresi gerekli');
-      return;
-    }
-    if (!u.startsWith('http://') && !u.startsWith('https://')) {
-      u = 'https://$u';
-    }
-    if (Uri.tryParse(u) == null) {
-      setState(() => _err = 'Gecersiz adres');
-      return;
-    }
-    if (!u.endsWith('/')) u = '$u/';
-    final c = Config(
-      url: u,
-      user: _user.text.trim(),
-      password: _pass.text,
-      allowInsecure: _insecure,
-    );
-    await c.save();
-    widget.onSaved(c);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('WebDAV Ayarlari'),
-        automaticallyImplyLeading: widget.cancelable,
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              TextField(
-                controller: _url,
-                keyboardType: TextInputType.url,
-                autocorrect: false,
-                decoration: const InputDecoration(
-                  labelText: 'Sunucu adresi',
-                  hintText: 'https://sunucu.com:5006/videolar/',
-                  border: OutlineInputBorder(),
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(inRoot ? 'İzleme Listem' : (folder?.name ?? 'Klasör')),
+            actions: [
+              if (inRoot)
+                IconButton(
+                  icon: const Icon(Icons.create_new_folder_outlined),
+                  tooltip: 'Yeni klasör',
+                  onPressed: _newFolder,
                 ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: _user,
-                autocorrect: false,
-                decoration: const InputDecoration(
-                  labelText: 'Kullanici adi',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: _pass,
-                obscureText: _obscure,
-                autocorrect: false,
-                decoration: InputDecoration(
-                  labelText: 'Sifre',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                        _obscure ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () => setState(() => _obscure = !_obscure),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Gecersiz SSL sertifikasina izin ver'),
-                subtitle: const Text('Kendinden imzali sertifika kullaniyorsaniz acin'),
-                value: _insecure,
-                onChanged: (v) => setState(() => _insecure = v),
-              ),
-              if (_err != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(_err!,
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.error)),
-                ),
-              const SizedBox(height: 16),
-              FilledButton(onPressed: _save, child: const Text('Kaydet')),
             ],
           ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: _openAdd,
+            icon: const Icon(Icons.add),
+            label: const Text('Listeme ekle'),
+          ),
+          body: empty ? _emptyView() : _list(folders, its),
+        );
+      },
+    );
+  }
+
+  Widget _emptyView() {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.playlist_play, size: 64, color: Colors.white38),
+            SizedBox(height: 12),
+            Text(
+              'Listen boş.\nSağ alttaki "Listeme ekle" ile sunucundan video veya klasör ekle.',
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
   }
+
+  Widget _list(List<WlFolder> folders, List<WlItem> its) {
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 96),
+      children: [
+        for (final f in folders)
+          ListTile(
+            leading: const SizedBox(
+              width: 32,
+              child: Center(
+                  child: Icon(Icons.folder_special, color: Colors.amber, size: 28)),
+            ),
+            title: Text(f.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+            subtitle: Text('${st.countIn(f.id)} öğe'),
+            trailing: PopupMenuButton<String>(
+              onSelected: (v) {
+                if (v == 'rename') _renameFolder(f);
+                if (v == 'delete') _deleteFolder(f);
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'rename', child: Text('Yeniden adlandır')),
+                PopupMenuItem(value: 'delete', child: Text('Klasörü sil')),
+              ],
+            ),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => WatchlistScreen(folderId: f.id),
+            )),
+          ),
+        for (final w in its)
+          ListTile(
+            leading: SizedBox(
+              width: 32,
+              child: Center(child: statusIcon(w.item, inWatchlist: true)),
+            ),
+            title: Text(w.item.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+            subtitle: progressText(w.item) == null
+                ? null
+                : Text(
+                    progressText(w.item)!,
+                    style: TextStyle(
+                      color: progressText(w.item) == 'İzlendi'
+                          ? null
+                          : Colors.orange,
+                    ),
+                  ),
+            trailing: PopupMenuButton<String>(
+              onSelected: (v) {
+                if (v == 'move') _moveItem(w);
+                if (v == 'remove') st.removeItem(w.item.key);
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'move', child: Text('Klasöre taşı')),
+                PopupMenuItem(value: 'remove', child: Text('Listeden çıkar')),
+              ],
+            ),
+            onTap: () => w.item.isDir ? _openDir(w.item) : _play(w.item),
+          ),
+      ],
+    );
+  }
 }
 
 // ============================================================================
-//  Dosya gezgini
+//  Sunucu gezgini (ekleme ekrani / klasor izleme)
 // ============================================================================
 class BrowserScreen extends StatefulWidget {
-  final Config cfg;
-  final VoidCallback onOpenSettings;
+  final Uri start;
+  final bool selectMode; // true: listeye ekleme ekrani
+  final String? targetFolder; // ekleme hedefi (null = ana liste)
   const BrowserScreen({
     super.key,
-    required this.cfg,
-    required this.onOpenSettings,
+    required this.start,
+    required this.selectMode,
+    this.targetFolder,
   });
   @override
   State<BrowserScreen> createState() => _BrowserScreenState();
@@ -490,6 +777,7 @@ class BrowserScreen extends StatefulWidget {
 
 class _BrowserScreenState extends State<BrowserScreen> {
   late final List<Uri> stack;
+  final Map<String, DavItem> selected = {};
   List<DavItem> items = [];
   bool loading = true;
   String? error;
@@ -497,17 +785,20 @@ class _BrowserScreenState extends State<BrowserScreen> {
   @override
   void initState() {
     super.initState();
-    var u = widget.cfg.url;
+    var u = widget.start.toString();
     if (!u.endsWith('/')) u = '$u/';
     stack = [Uri.parse(u)];
     _load();
   }
 
   String get _title {
-    final segs =
-        stack.last.pathSegments.where((s) => s.isNotEmpty).toList();
-    return segs.isEmpty ? 'WebDAV' : _decode(segs.last);
+    if (widget.selectMode && stack.length == 1) return 'Listeye ekle';
+    final segs = stack.last.pathSegments.where((s) => s.isNotEmpty).toList();
+    return segs.isEmpty ? 'Sunucu' : _decode(segs.last);
   }
+
+  bool get _allSelected =>
+      items.isNotEmpty && items.every((i) => selected.containsKey(i.key));
 
   Future<void> _load() async {
     setState(() {
@@ -515,7 +806,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
       error = null;
     });
     try {
-      final r = await propfind(widget.cfg, stack.last);
+      final r = await propfind(kConfig, stack.last);
       if (!mounted) return;
       setState(() {
         items = r;
@@ -538,58 +829,65 @@ class _BrowserScreenState extends State<BrowserScreen> {
     }
   }
 
-  Future<void> _open(DavItem it) async {
-    if (it.isDir) {
-      stack.add(it.uri);
-      _load();
-      return;
+  void _toggle(DavItem it) {
+    setState(() {
+      if (selected.containsKey(it.key)) {
+        selected.remove(it.key);
+      } else {
+        selected[it.key] = it;
+      }
+    });
+  }
+
+  void _toggleAll() {
+    setState(() {
+      if (_allSelected) {
+        for (final i in items) {
+          selected.remove(i.key);
+        }
+      } else {
+        for (final i in items) {
+          selected[i.key] = i;
+        }
+      }
+    });
+  }
+
+  Future<void> _addSelected({required bool pickFolder}) async {
+    String? folder = widget.targetFolder;
+    if (pickFolder) {
+      final c = await showFolderPicker(
+        context,
+        current: folder,
+        title: 'Hangi klasöre eklensin?',
+      );
+      if (c == null) return;
+      folder = c.id;
     }
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => PlayerScreen(cfg: widget.cfg, item: it),
+    final r = await WatchlistStore.instance
+        .addAll(selected.values.toList(), folder: folder);
+    if (!mounted) return;
+    final parts = <String>[
+      if (r.added > 0) '${r.added} öğe eklendi',
+      if (r.moved > 0) '${r.moved} öğe klasöre taşındı',
+    ];
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(
+          parts.isEmpty ? 'Seçilenler zaten listede' : parts.join(', ')),
     ));
-    if (mounted) setState(() {}); // ikonlari guncelle
+    setState(selected.clear);
   }
 
-  Widget _leading(DavItem it) {
-    if (it.isDir) return const Icon(Icons.folder, color: Colors.amber, size: 28);
-    final e = ProgressStore.instance.get(it.key);
-    if (e.watched) {
-      return const Icon(Icons.check_circle, color: Colors.green, size: 28);
-    }
-    if (e.pos > 5 && e.dur > 0) {
-      return SizedBox(
-        width: 26,
-        height: 26,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            SizedBox.expand(
-              child: CircularProgressIndicator(
-                value: (e.pos / e.dur).clamp(0.03, 1.0),
-                strokeWidth: 3.5,
-                color: Colors.orange,
-                backgroundColor: Colors.white24,
-              ),
-            ),
-            const Icon(Icons.play_arrow, size: 14, color: Colors.orange),
-          ],
-        ),
-      );
-    }
-    return const Icon(Icons.movie_outlined, color: Colors.white38, size: 26);
+  Future<void> _enter(DavItem it) async {
+    stack.add(it.uri);
+    await _load();
   }
 
-  Widget? _subtitle(DavItem it) {
-    if (it.isDir) return null;
-    final e = ProgressStore.instance.get(it.key);
-    if (!e.watched && e.pos > 5 && e.dur > 0) {
-      return Text(
-        '${fmtSec(e.pos)} / ${fmtSec(e.dur)}  •  %${(e.pos / e.dur * 100).floor()}',
-        style: const TextStyle(color: Colors.orange),
-      );
-    }
-    if (e.watched) return const Text('Izlendi');
-    return null;
+  Future<void> _play(DavItem it) async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => PlayerScreen(cfg: kConfig, item: it),
+    ));
+    if (mounted) setState(() {});
   }
 
   @override
@@ -601,22 +899,83 @@ class _BrowserScreenState extends State<BrowserScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          leading: stack.length > 1
-              ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: _up)
-              : null,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (stack.length > 1) {
+                _up();
+              } else {
+                Navigator.of(context).maybePop();
+              }
+            },
+          ),
           title: Text(_title, overflow: TextOverflow.ellipsis),
           actions: [
+            if (widget.selectMode && items.isNotEmpty)
+              TextButton.icon(
+                onPressed: _toggleAll,
+                icon: Icon(_allSelected ? Icons.deselect : Icons.select_all),
+                label: Text(_allSelected ? 'Seçimi kaldır' : 'Tümünü seç'),
+              ),
             IconButton(
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Yenile',
-                onPressed: _load),
-            IconButton(
-                icon: const Icon(Icons.settings),
-                tooltip: 'Ayarlar',
-                onPressed: widget.onOpenSettings),
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Yenile',
+              onPressed: _load,
+            ),
           ],
         ),
         body: _body(),
+        bottomNavigationBar:
+            widget.selectMode && selected.isNotEmpty ? _selectBar() : null,
+      ),
+    );
+  }
+
+  Widget _selectBar() {
+    return Material(
+      elevation: 8,
+      color: Colors.grey.shade900,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    tooltip: 'Seçimi temizle',
+                    onPressed: () => setState(selected.clear),
+                  ),
+                  Text('${selected.length} seçili'),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _addSelected(pickFolder: true),
+                    icon: const Icon(Icons.create_new_folder_outlined),
+                    label: const Text('Klasöre ekle'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: () => _addSelected(pickFolder: false),
+                    icon: const Icon(Icons.playlist_add),
+                    label: Text(widget.targetFolder == null
+                        ? 'Listeme ekle'
+                        : 'Bu klasöre ekle'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -645,25 +1004,53 @@ class _BrowserScreenState extends State<BrowserScreen> {
       );
     }
     if (items.isEmpty) {
-      return const Center(child: Text('Video bulunamadi'));
+      return const Center(child: Text('Video bulunamadı'));
     }
+    final wl = WatchlistStore.instance;
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
         itemCount: items.length,
         itemBuilder: (_, i) {
           final it = items[i];
+          final inList = widget.selectMode && wl.contains(it.key);
+          final prog = progressText(it);
+          final sub = [
+            if (inList) 'Listede',
+            if (prog != null) prog,
+          ].join('  •  ');
+          final sel = selected.containsKey(it.key);
           return ListTile(
-            leading: SizedBox(width: 32, child: Center(child: _leading(it))),
+            selected: sel,
+            selectedTileColor: Colors.white12,
+            leading: SizedBox(width: 32, child: Center(child: statusIcon(it))),
             title: Text(it.name, maxLines: 2, overflow: TextOverflow.ellipsis),
-            subtitle: _subtitle(it),
-            onTap: () => _open(it),
+            subtitle: sub.isEmpty
+                ? null
+                : Text(sub,
+                    style: TextStyle(
+                        color: prog != null && prog != 'İzlendi'
+                            ? Colors.orange
+                            : null)),
+            trailing: widget.selectMode
+                ? Checkbox(value: sel, onChanged: (_) => _toggle(it))
+                : null,
+            onTap: () {
+              if (it.isDir) {
+                _enter(it);
+              } else if (widget.selectMode) {
+                _toggle(it);
+              } else {
+                _play(it);
+              }
+            },
           );
         },
       ),
     );
   }
 }
+
 
 // ============================================================================
 //  Oynatici
@@ -834,16 +1221,34 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
     final k = e.logicalKey;
     final shift = HardwareKeyboard.instance.isShiftPressed;
-    if (k == LogicalKeyboardKey.space) {
+    if (k == LogicalKeyboardKey.space ||
+        k == LogicalKeyboardKey.select ||
+        k == LogicalKeyboardKey.enter ||
+        k == LogicalKeyboardKey.mediaPlayPause) {
       player.playOrPause();
-    } else if (k == LogicalKeyboardKey.arrowLeft) {
+    } else if (k == LogicalKeyboardKey.mediaPlay) {
+      player.play();
+    } else if (k == LogicalKeyboardKey.mediaPause) {
+      player.pause();
+    } else if (k == LogicalKeyboardKey.arrowLeft ||
+        k == LogicalKeyboardKey.mediaRewind) {
       _seekBy(shift ? -60 : -10);
-    } else if (k == LogicalKeyboardKey.arrowRight) {
+    } else if (k == LogicalKeyboardKey.arrowRight ||
+        k == LogicalKeyboardKey.mediaFastForward) {
       _seekBy(shift ? 60 : 10);
     } else if (k == LogicalKeyboardKey.arrowUp) {
-      _setVolume(_volume + 5);
+      // Masaustunde ses, TV/telefonda hiz (ses uzaktan kumandadan ayarlanir)
+      if (_isMobile) {
+        _changeSpeed(1);
+      } else {
+        _setVolume(_volume + 5);
+      }
     } else if (k == LogicalKeyboardKey.arrowDown) {
-      _setVolume(_volume - 5);
+      if (_isMobile) {
+        _changeSpeed(-1);
+      } else {
+        _setVolume(_volume - 5);
+      }
     } else if (k == LogicalKeyboardKey.bracketRight) {
       _changeSpeed(1);
     } else if (k == LogicalKeyboardKey.bracketLeft) {

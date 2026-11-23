@@ -20,24 +20,43 @@ jobs:
           cache: true
       - name: Android iskeletini uret
         run: flutter create --platforms=android --org com.example --project-name webdav_player .
-      - name: Manifest ve minSdk ayarla (Android 10+ / arm64)
+      - name: Manifest (internet, http, Android TV) ve minSdk 29
         run: |
-          MANIFEST=android/app/src/main/AndroidManifest.xml
-          # internet izni + http (sifresiz) baglantilara izin
-          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application android:usesCleartextTraffic="true"#' "$MANIFEST"
-          sed -i 's/android:label="[^"]*"/android:label="WebDAV Player"/' "$MANIFEST"
+          python3 - <<'PY'
+          import re
+          p = "android/app/src/main/AndroidManifest.xml"
+          s = open(p, encoding="utf-8").read()
+          extra = (
+              '<uses-permission android:name="android.permission.INTERNET"/>\n'
+              '    <uses-feature android:name="android.software.leanback" android:required="false"/>\n'
+              '    <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>\n'
+              '    <application android:usesCleartextTraffic="true"'
+          )
+          s = s.replace("<application", extra, 1)
+          s = re.sub(r'android:label="[^"]*"', 'android:label="WebDAV Player"', s, count=1)
+          tv = '<category android:name="android.intent.category.LEANBACK_LAUNCHER"/>'
+          s = s.replace(
+              '<category android:name="android.intent.category.LAUNCHER"/>',
+              '<category android:name="android.intent.category.LAUNCHER"/>\n                ' + tv,
+              1,
+          )
+          open(p, "w", encoding="utf-8").write(s)
+          PY
+          cat android/app/src/main/AndroidManifest.xml
           GR=android/app/build.gradle
           [ -f "$GR" ] || GR=android/app/build.gradle.kts
           sed -i -E 's/minSdk(Version)? *(=)? *flutter\.minSdkVersion/minSdk\1 \2 29/' "$GR"
           sed -i -E 's/minSdkVersion +flutter\.minSdkVersion/minSdkVersion 29/' "$GR"
           grep -n "minSdk" "$GR"
       - run: flutter pub get
-      - name: APK (arm64-v8a)
-        run: flutter build apk --release --target-platform android-arm64
+      - name: APK (arm64-v8a + armeabi-v7a)
+        run: flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64
       - uses: actions/upload-artifact@v4
         with:
-          name: webdav-player-android-arm64
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: webdav-player-android
+          path: |
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
 
   macos:
     runs-on: macos-15
