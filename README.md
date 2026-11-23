@@ -1,15 +1,17 @@
-# Namaz Vakti
+# WebDAV Player
 
-Bir sonraki namaz vaktine kalan dakikayı gösteren basit Android uygulaması.
+libmpv (media_kit) tabanli sade WebDAV video oynatici. macOS (Apple Silicon, 15+) ve Android (arm64, Android 10+).
 
-- İl değiştirmek için sağ üstteki il adına uzun basın.
-- Ana ekranda üstte cam efektli geri sayım kartı (örn. "Yatsı vaktine 19dk"), altta 5 vakit kutucuğu (İmsak, Öğle, İkindi, Akşam, Yatsı) her zaman görünür; sıradaki vakit altın çerçeveyle vurgulanır. Güneş vakti kartın altında küçük satır olarak gösterilir.
+- Oynat/duraklat, +-10 sn sarma, hiz, ses (masaustu)
+- Kaldigin yerden devam
+- Izlendi (yesil tik) / yarim kaldi (turuncu ilerleme) ikonlari
 
-## Widget
-Ana ekranda uzun basıp **Widget'lar → Namaz Vakti** seçin. Sıradaki vakte kalan süreyi (örn. "Akşam vaktine 3sa 12dk") saat ve dakika olarak gösterir (dakikada bir güncellenir); dokununca uygulama açılır. Widget 1x3 (1 hücre geniş, 3 hücre yüksek) boyutundadır: üstte küçük bir cam kartta sıradaki vaktin adı ve kalan süre, onun altında 5 vakit (ad üstte, saat altta) alt alta gösterilir; sıradaki vakit altın çerçeve ve sarı yazıyla vurgulanır. Tüm yazılar kalındır ve widget'ın gerçek ölçüsüne sığan en büyük boyutta hesaplanır (yeniden boyutlandırınca otomatik güncellenir).
+## Derleme
+1. Bu klasoru GitHub reposuna yukle (main dalina push).
+2. Actions sekmesinde "Build" calisir (veya "Run workflow").
+3. Artifacts bolumunden APK ve macOS zip'ini indir.
 
-İkinci bir **Namaz Vakti (2x2)** widget'ı da vardır: ortada en büyük kalın yazıyla şu anki saat, altında sıradaki vakte kalan süre (sa/dk) gösterilir; her dakika güncellenir ve yeniden boyutlandırınca yazılar otomatik büyür/küçülür. Widget listesinde iki widget da "Namaz Vakti" altında görünür (1x3 ve 2x2).
-
-## GitHub'da derleme
-Depoya push yapınca **Actions** sekmesinde "Android APK Derle" çalışır.
-Bittiğinde çalıştırmanın altındaki **Artifacts → NamazVakti-debug-apk** dosyasını indirin.
+Notlar:
+- Android/macOS klasorleri CI'da `flutter create` ile uretilir, repoda tutulmaz.
+- APK imzasiz-debug anahtariyla imzalanir; telefona "bilinmeyen kaynak" izniyle kurulur.
+- macOS uygulamasi imzasizdir: ilk acilista sag tik > Ac, ya da `xattr -cr webdav_player.app`.

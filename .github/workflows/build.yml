@@ -1,39 +1,68 @@
-name: Android APK Derle
+name: Build
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
-  build:
+  android:
     runs-on: ubuntu-latest
     steps:
-      - name: Kodu indir
-        uses: actions/checkout@v4
-
-      - name: JDK 17 kur
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
-
-      # ubuntu-latest üzerinde Android SDK hazır gelir; sadece lisansları kabul et
-      - name: Android SDK lisanslarını kabul et
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-
-      - name: Gradle kur
-        uses: gradle/actions/setup-gradle@v4
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
         with:
-          gradle-version: 8.9
-
-      - name: Debug APK derle
-        run: gradle assembleDebug --stacktrace
-
-      - name: APK dosyasını yükle
-        uses: actions/upload-artifact@v4
+          channel: stable
+          cache: true
+      - name: Android iskeletini uret
+        run: flutter create --platforms=android --org com.example --project-name webdav_player .
+      - name: Manifest ve minSdk ayarla (Android 10+ / arm64)
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          # internet izni + http (sifresiz) baglantilara izin
+          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application android:usesCleartextTraffic="true"#' "$MANIFEST"
+          sed -i 's/android:label="[^"]*"/android:label="WebDAV Player"/' "$MANIFEST"
+          GR=android/app/build.gradle
+          [ -f "$GR" ] || GR=android/app/build.gradle.kts
+          sed -i -E 's/minSdk(Version)? *(=)? *flutter\.minSdkVersion/minSdk\1 \2 29/' "$GR"
+          sed -i -E 's/minSdkVersion +flutter\.minSdkVersion/minSdkVersion 29/' "$GR"
+          grep -n "minSdk" "$GR"
+      - run: flutter pub get
+      - name: APK (arm64-v8a)
+        run: flutter build apk --release --target-platform android-arm64
+      - uses: actions/upload-artifact@v4
         with:
-          name: NamazVakti-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+          name: webdav-player-android-arm64
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: macOS iskeletini uret
+        run: flutter create --platforms=macos --org com.example --project-name webdav_player .
+      - name: Ag izni (sandbox) ve hedef surum
+        run: |
+          for f in macos/Runner/DebugProfile.entitlements macos/Runner/Release.entitlements; do
+            /usr/libexec/PlistBuddy -c "Add :com.apple.security.network.client bool true" "$f" || true
+          done
+          sed -i '' 's/MACOSX_DEPLOYMENT_TARGET = [0-9.]*;/MACOSX_DEPLOYMENT_TARGET = 15.0;/' macos/Runner.xcodeproj/project.pbxproj
+          sed -i '' "s/platform :osx, '[0-9.]*'/platform :osx, '15.0'/" macos/Podfile || true
+      - run: flutter pub get
+      - run: flutter build macos --release
+      - name: Zip
+        run: |
+          cd build/macos/Build/Products/Release
+          ditto -c -k --sequesterRsrc --keepParent webdav_player.app "$GITHUB_WORKSPACE/webdav-player-macos.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webdav-player-macos-arm64
+          path: webdav-player-macos.zip
