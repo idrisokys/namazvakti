@@ -1,22 +1,15 @@
-# WebDAV Player
+# Namaz Vakti
 
-libmpv (media_kit) tabanli sade WebDAV video oynatici.
-macOS (Apple Silicon, 15+), Android 10+ (arm64 + armv7), Android TV.
+Bir sonraki namaz vaktine kalan dakikayı gösteren basit Android uygulaması.
 
-- Sunucu sabit: `http://192.168.1.44:8080/` (lib/main.dart icinde `_serverUrl`)
-- Acilis ekrani: Izleme Listem. Sag alttaki "Listeme ekle" ile sunucudan klasor/video ekle
-- Ekleme ekraninda "Tumunu sec" veya tek tek secim; secilenleri listeye ya da yeni klasore ekle
-- Izleme listesinde klasor olusturma, yeniden adlandirma, silme, ogeleri klasore tasima
-- Oynat/duraklat, +-10 sn sarma, hiz; kaldigin yerden devam; izlendi (yesil tik) / yarim (turuncu ilerleme)
-- TV uzaktan kumanda: OK oynat/duraklat, sol/sag +-10 sn, yukari/asagi hiz
-- Yatay ekran desteklenir (oynatici yatay acilir)
+- İl değiştirmek için sağ üstteki il adına uzun basın.
+- Ana ekranda üstte cam efektli geri sayım kartı (örn. "Yatsı vaktine 19dk"), altta 5 vakit kutucuğu (İmsak, Öğle, İkindi, Akşam, Yatsı) her zaman görünür; sıradaki vakit altın çerçeveyle vurgulanır. Güneş vakti kartın altında küçük satır olarak gösterilir.
 
-## Derleme
-1. Zip'i bilgisayarda ac, icindekileri (lib, pubspec.yaml, .gitignore, README.md, .github) repo kokune koy, main dalina push et.
-2. Actions > "Build" (gerekirse "Run workflow").
-3. Artifacts: `webdav-player-android` (arm64-v8a ve armeabi-v7a APK) ve macOS zip.
+## Widget
+Ana ekranda uzun basıp **Widget'lar → Namaz Vakti** seçin. Sıradaki vakte kalan süreyi (örn. "Akşam vaktine 3sa 12dk") saat ve dakika olarak gösterir (dakikada bir güncellenir); dokununca uygulama açılır. Widget 1x3 (1 hücre geniş, 3 hücre yüksek) boyutundadır: üstte küçük bir cam kartta sıradaki vaktin adı ve kalan süre, onun altında 5 vakit (ad üstte, saat altta) alt alta gösterilir; sıradaki vakit altın çerçeve ve sarı yazıyla vurgulanır. Tüm yazılar kalındır ve widget'ın gerçek ölçüsüne sığan en büyük boyutta hesaplanır (yeniden boyutlandırınca otomatik güncellenir).
 
-Notlar:
-- Android/macOS klasorleri CI'da `flutter create` ile uretilir.
-- APK debug anahtariyla imzalanir; "bilinmeyen kaynak" izniyle kurulur.
-- macOS uygulamasi imzasizdir: ilk acilista sag tik > Ac, ya da `xattr -cr webdav_player.app`.
+İkinci bir **Namaz Vakti (2x2)** widget'ı da vardır: ortada en büyük kalın yazıyla şu anki saat, altında sıradaki vakte kalan süre (sa/dk) gösterilir; her dakika güncellenir ve yeniden boyutlandırınca yazılar otomatik büyür/küçülür. Widget listesinde iki widget da "Namaz Vakti" altında görünür (1x3 ve 2x2).
+
+## GitHub'da derleme
+Depoya push yapınca **Actions** sekmesinde "Android APK Derle" çalışır.
+Bittiğinde çalıştırmanın altındaki **Artifacts → NamazVakti-debug-apk** dosyasını indirin.

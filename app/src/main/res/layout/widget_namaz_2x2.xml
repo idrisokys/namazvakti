@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/glass_card"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="4dp">
+
+    <!-- Şu anki saat -->
+    <TextView
+        android:id="@+id/w_clock"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textColor="#FFFFFF"
+        android:textSize="44sp"
+        android:textStyle="bold" />
+
+    <!-- Sıradaki vakte kalan süre (sa / dk) -->
+    <TextView
+        android:id="@+id/w_remain"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:fontFamily="sans-serif"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxLines="2"
+        android:textColor="#FFFFFF"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+</LinearLayout>
